@@ -1,128 +1,248 @@
 import 'package:flutter/material.dart';
-import 'login.dart'; // Mengimpor halaman LoginScreen untuk navigasi ke halaman login
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'login.dart';  // Pastikan LoginScreen terimport dengan benar
 
-class HomeScreen extends StatelessWidget {
+// Widget utama untuk tampilan HomeScreen
+class HomeScreen extends StatefulWidget {
+  final String username; // Nama akun pengguna yang login
+  const HomeScreen({required this.username});
+
+  @override
+  _HomeScreenState createState() => _HomeScreenState();
+}
+
+// State untuk HomeScreen
+class _HomeScreenState extends State<HomeScreen> {
+  final SupabaseClient _supabase = Supabase.instance.client; // Inisialisasi SupabaseClient
+
+  // Controller untuk TextField
+  final TextEditingController _namaProdukController = TextEditingController();
+  final TextEditingController _hargaController = TextEditingController();
+  final TextEditingController _stokController = TextEditingController();
+
+  // Fungsi untuk menambahkan produk ke database
+  Future<void> _addProduct() async {
+    final namaProduk = _namaProdukController.text.trim();
+    final harga = double.tryParse(_hargaController.text.trim());
+    final stok = int.tryParse(_stokController.text.trim());
+
+    // Validasi input
+    if (namaProduk.isEmpty || harga == null || stok == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Mohon isi semua data dengan benar!')),
+      );
+      return;
+    }
+
+    try {
+      // Menambahkan produk ke tabel 'produk' di Supabase
+      await _supabase.from('produk').insert({
+        'namaproduk': namaProduk,
+        'harga': harga,
+        'stok': stok,
+      });
+
+      // Tampilkan pesan sukses
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Produk berhasil ditambahkan!')),
+      );
+
+      // Kosongkan input setelah berhasil
+      _namaProdukController.clear();
+      _hargaController.clear();
+      _stokController.clear();
+
+      setState(() {}); // Refresh tampilan
+    } catch (e) {
+      // Menampilkan pesan error jika gagal
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal menambahkan produk: $e')),
+      );
+    }
+  }
+
+  // Fungsi untuk mengambil data produk dari database
+  Future<List<Map<String, dynamic>>> _fetchProducts() async {
+    try {
+      // Mengambil data produk dari tabel 'produk'
+      final response = await _supabase.from('produk').select();
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      // Menampilkan pesan error jika gagal memuat produk
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal memuat produk: $e')),
+      );
+      return [];
+    }
+  }
+
+  // Fungsi untuk logout
+  void _logout() {
+    _supabase.auth.signOut(); // Logout dari Supabase
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => LoginScreen()),  // Arahkan ke halaman Login
+    );
+  }
+
+  // Konfirmasi logout dengan dialog
+  void _showLogoutDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Konfirmasi Logout'),
+          content: const Text('Apakah Anda yakin ingin logout?'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Tutup dialog
+              },
+              child: const Text('Batal'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pushReplacement( // Navigasi ke halaman login setelah logout
+                context,
+                MaterialPageRoute(builder: (context) => LoginScreen()), // Pindah ke halaman LoginScreen
+              );
+              },
+              child: const Text('Logout'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // Scaffold adalah struktur dasar halaman aplikasi Flutter.
       appBar: AppBar(
-        backgroundColor: Colors.white, // Warna latar belakang AppBar
-        elevation: 0, // Menghilangkan bayangan pada AppBar
-        title: const Text(
-          "Cake Shop", // Judul yang ditampilkan di AppBar
-          style: TextStyle(
-            color: Colors.pink, // Warna teks pada AppBar
-            fontSize: 20, // Ukuran font teks
-            fontWeight: FontWeight.bold, // Gaya font bold
-          ),
-        ),
+        title: const Text('Kasir Cake Shop'),
+        backgroundColor: Colors.pinkAccent,  // Warna background AppBar
         actions: [
-          // Bagian untuk menambahkan ikon dan tombol di sisi kanan AppBar
-          
-          // Ikon Home dengan tulisan "Home"
+          // Tombol logout di AppBar
           IconButton(
-            icon: const Icon(Icons.home, color: Colors.pink), // Ikon rumah
-            onPressed: () {}, // Fungsi yang akan dijalankan saat ikon ditekan (kosong)
-            tooltip: "Home", // Tooltip yang muncul ketika ikon di-hover atau diketuk
-          ),
-          
-          // Ikon Keranjang dengan tulisan "Data Produk"
-          IconButton(
-            icon: const Icon(Icons.shopping_cart, color: Colors.pink), // Ikon keranjang
-            onPressed: () {}, // Fungsi yang akan dijalankan saat ikon ditekan (kosong)
-            tooltip: "Data Produk", // Tooltip yang muncul ketika ikon di-hover atau diketuk
-          ),
-          
-          // Tombol Logout
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.pink), // Ikon logout
-            onPressed: () {
-              // Menampilkan dialog konfirmasi logout ketika ikon logout ditekan
-              showDialog(
-                context: context,
-                builder: (BuildContext context) {
-                  return AlertDialog(
-                    title: const Text("Konfirmasi Logout"), // Judul dialog
-                    content: const Text("Apakah Anda yakin ingin melogout?"), // Pesan dalam dialog
-                    actions: <Widget>[
-                      // Tombol-tombol dalam dialog
-                      TextButton(
-                        onPressed: () {
-                          // Menutup dialog jika pengguna memilih Batal
-                          Navigator.of(context).pop();
-                        },
-                        child: const Text("Batal"), // Teks pada tombol Batal
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          // Menavigasi pengguna ke halaman login jika memilih Ya
-                          Navigator.pushReplacement(
-                            context,
-                            MaterialPageRoute(builder: (context) => LoginScreen()),
-                          );
-                        },
-                        child: const Text("Ya"), // Teks pada tombol Ya
-                      ),
-                    ],
-                  );
-                },
-              );
-            },
-            tooltip: "Logout",
+            icon: const Icon(Icons.exit_to_app),
+            onPressed: _showLogoutDialog, // Panggil dialog konfirmasi logout
           ),
         ],
       ),
-      
-      body: Container(
-        color: const Color(0xFFFFF5F7), // Warna latar belakang halaman
-        child: Padding(
-          padding: const EdgeInsets.all(16.0), // Memberikan padding di sekeliling body
-          child: GridView.builder(
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 4, // Dua kolom per baris
-              crossAxisSpacing: 30, // Jarak horizontal antar kolom
-              mainAxisSpacing: 20, // Jarak vertikal antar baris
+      drawer: Drawer(
+        child: Column(
+          children: [
+            // Header drawer dengan nama pengguna
+            UserAccountsDrawerHeader(
+              accountName: Text(widget.username),
+              accountEmail: Text('kasir@cakeshop.com'),
+              currentAccountPicture: const CircleAvatar(
+                backgroundColor: Colors.white,
+                child: Icon(Icons.person, size: 40, color: Colors.pinkAccent),
+              ),
+              decoration: const BoxDecoration(
+                color: Colors.pinkAccent,
+              ),
             ),
-            itemCount: 8, // Jumlah item yang ditampilkan dalam grid
-            itemBuilder: (context, index) {
-              // Membangun item dalam grid
-              return Container(
-                width: 60, // Lebar Container yang lebih kecil
-                height: 60, // Tinggi Container yang lebih kecil
-                decoration: BoxDecoration(
-                  color: Colors.white, // Warna latar belakang setiap kartu
-                  borderRadius: BorderRadius.circular(16), // Sudut kartu melengkung
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1), // Warna bayangan kartu
-                      blurRadius: 10, // Efek blur pada bayangan
-                      offset: const Offset(0, 4), // Posisi bayangan
-                    ),
-                  ],
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center, // Menyusun widget secara vertikal di tengah
-                  children: [
-                    const Icon(
-                      Icons.cake, // Ikon kue
-                      color: Colors.pink, // Warna ikon
-                      size: 20, // Ukuran ikon
-                    ),
-                    const SizedBox(height: 4), // Jarak vertikal yang lebih kecil antar ikon dan teks
-                    const Text(
-                      "Red Velvet Cake", // Placeholder nama kue
-                      style: TextStyle(
-                        fontSize: 16, // Ukuran teks
-                        fontWeight: FontWeight.bold, // Gaya teks bold
-                        color: Colors.black54, // Warna teks
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
+            // Navigasi ke halaman Home
+            ListTile(
+              leading: const Icon(Icons.home),
+              title: const Text('Home'),
+              onTap: () {
+                Navigator.pop(context);
+              },
+            ),
+            // Navigasi ke halaman Transaksi
+            ListTile(
+              leading: const Icon(Icons.shopping_cart),
+              title: const Text('Transaksi'),
+              onTap: () {
+                Navigator.pushNamed(context, '/transaksi');
+              },
+            ),
+            // Navigasi ke halaman Produk
+            ListTile(
+              leading: const Icon(Icons.inventory),
+              title: const Text('Produk'),
+              onTap: () {
+                Navigator.pushNamed(context, '/produk');
+              },
+            ),
+          ],
+        ),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),  // Padding sekitar konten
+        child: Column(
+          children: [
+            // Input untuk Nama Produk
+            TextField(
+              controller: _namaProdukController,
+              decoration: const InputDecoration(
+                labelText: 'Nama Produk',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 10),
+            // Input untuk Harga Produk
+            TextField(
+              controller: _hargaController,
+              decoration: const InputDecoration(
+                labelText: 'Harga',
+                border: OutlineInputBorder(),
+              ),
+              keyboardType: TextInputType.number,
+            ),
+            const SizedBox(height: 10),
+            // Input untuk Stok Produk
+            TextField(
+              controller: _stokController,
+              decoration: const InputDecoration(
+                labelText: 'Stok',
+                border: OutlineInputBorder(),
+              ),
+              keyboardType: TextInputType.number,
+            ),
+            const SizedBox(height: 20),
+            // Tombol untuk menambahkan produk
+            ElevatedButton(
+              onPressed: _addProduct,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.pinkAccent,  // Warna tombol
+              ),
+              child: const Text('Tambah Produk'),
+            ),
+            const SizedBox(height: 20),
+            // Menampilkan daftar produk
+            Expanded(
+              child: FutureBuilder<List<Map<String, dynamic>>>(  // Mengambil data produk
+                future: _fetchProducts(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  } else if (snapshot.hasError) {
+                    return Center(child: Text('Error: ${snapshot.error}'));
+                  } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                    return const Center(child: Text('Tidak ada produk.'));
+                  }
+
+                  final products = snapshot.data!; // Daftar produk
+                  return ListView.builder(
+                    itemCount: products.length,
+                    itemBuilder: (context, index) {
+                      final product = products[index];
+                      return Card(
+                        child: ListTile(
+                          title: Text(product['namaproduk']),  // Nama produk
+                          subtitle: Text('Harga: ${product['harga']} | Stok: ${product['stok']}'),  // Detail produk
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
         ),
       ),
     );
