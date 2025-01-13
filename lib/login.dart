@@ -1,6 +1,21 @@
 import 'package:flutter/material.dart';
 import 'home.dart'; // Pastikan untuk mengimpor HomeScreen, halaman tujuan setelah login
 
+// Definisikan RegisterScreen di sini atau di file terpisah
+class RegisterScreen extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("Register"),
+      ),
+      body: Center(
+        child: const Text("Register Screen"), // Ganti dengan UI registrasi yang sesuai
+      ),
+    );
+  }
+}
+
 class LoginScreen extends StatefulWidget {
   @override
   _LoginScreenState createState() => _LoginScreenState(); // Menyediakan status untuk halaman login
@@ -35,7 +50,7 @@ class _LoginScreenState extends State<LoginScreen> {
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFFB0C4F5), Color(0xFF8993C9)], // Warna gradasi latar belakang
+            colors: [Color(0xFFFFE4E1), Color(0xFFFFB6C1)], // Warna gradasi latar belakang
             begin: Alignment.topLeft, // Titik awal gradasi di pojok kiri atas
             end: Alignment.bottomRight, // Titik akhir gradasi di pojok kanan bawah
           ),
@@ -45,7 +60,7 @@ class _LoginScreenState extends State<LoginScreen> {
             width: 350, // Lebar kontainer utama
             padding: const EdgeInsets.all(20), // Padding di dalam kontainer
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.3), // Latar belakang dengan opasitas
+              color: Colors.white.withOpacity(0.5), // Latar belakang dengan opasitas
               borderRadius: BorderRadius.circular(20), // Membulatkan sudut kontainer
               boxShadow: [
                 BoxShadow(
@@ -56,7 +71,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ],
             ),
             child: Column(
-              mainAxisSize: MainAxisSize.min, // Mengatur ukuran kolom agar sekecil mungkin
+              mainAxisSize: MainAxisSize.min, // Mengatur ukuran kolom 
               crossAxisAlignment: CrossAxisAlignment.stretch, // Agar elemen kolom melebar
               children: [
                 const CircleAvatar(
@@ -65,7 +80,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: Icon(
                     Icons.person, // Ikon orang
                     size: 50, // Ukuran ikon
-                    color: Color.fromARGB(255, 164, 172, 216), // Warna ikon
+                    color: Color.fromARGB(255, 255, 192, 203), // Warna ikon
                   ),
                 ),
                 const SizedBox(height: 20), // Spasi antara elemen
@@ -137,7 +152,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     }
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue, // Warna latar belakang tombol
+                    backgroundColor: Color(0xFFFFC0CB), // Warna latar belakang tombol
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10), // Sudut border tombol
                     ),
@@ -145,7 +160,35 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   child: const Text(
                     "LOGIN", // Teks di tombol login
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color.fromARGB(255, 245, 247, 248)),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () {
+                    // Navigasi ke halaman registrasi
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => RegisterScreen()),
+                    );
+                  },
+                  child: RichText(
+                    textAlign: TextAlign.center,
+                    text: TextSpan(
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      children: [
+                        const TextSpan(
+                          text: "Don't have an account? ", // Teks yang pertama
+                          style: TextStyle(color: Colors.black), // Warna hitam untuk teks pertama
+                        ),
+                        TextSpan(
+                          text: "Register here", // Teks yang kedua
+                          style: TextStyle(color: Colors.blue), // Warna biru untuk teks kedua
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],

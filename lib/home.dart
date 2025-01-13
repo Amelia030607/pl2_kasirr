@@ -1,67 +1,128 @@
-import 'package:flutter/material.dart';  // Mengimpor pustaka Flutter untuk membangun UI aplikasi.
+import 'package:flutter/material.dart';
 import 'login.dart'; // Mengimpor halaman LoginScreen untuk navigasi ke halaman login
 
-class HomeScreen extends StatelessWidget {  // Mendeklarasikan HomeScreen sebagai widget stateless.
-  // Data tentang kue yang akan ditampilkan dalam bentuk list
-  final List<Map<String, String>> cakeData = [
-    {'name': 'Chocolate Cake', 'price': '50.000'},
-    {'name': 'Vanilla Cake', 'price': '45.000'},
-    {'name': 'Strawberry Cake', 'price': '55.000'},
-    {'name': 'Red Velvet Cake', 'price': '65.000'},
-  ];
-
+class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Scaffold(  // Membuat struktur da sar halaman (Scaffold) untuk halaman home
-      appBar: AppBar(  // Membuat app bar dengan judul dan tombol logout
-        title: const Text("Kasir Penjualan Cake"),  // Judul app bar
-        backgroundColor: Color(0xFF8993C9),  // Warna app bar
-        centerTitle: true,
+    return Scaffold(
+      // Scaffold adalah struktur dasar halaman aplikasi Flutter.
+      appBar: AppBar(
+        backgroundColor: Colors.white, // Warna latar belakang AppBar
+        elevation: 0, // Menghilangkan bayangan pada AppBar
+        title: const Text(
+          "Cake Shop", // Judul yang ditampilkan di AppBar
+          style: TextStyle(
+            color: Colors.pink, // Warna teks pada AppBar
+            fontSize: 20, // Ukuran font teks
+            fontWeight: FontWeight.bold, // Gaya font bold
+          ),
+        ),
         actions: [
-          IconButton(  // Tombol logout di bagian actions app bar
-            icon: const Icon(Icons.logout),  // Ikon logout
-            onPressed: () {  // Ketika tombol logout ditekan
-              // Navigasi kembali ke halaman login
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => LoginScreen()),  // Menavigasi ke LoginScreen
+          // Bagian untuk menambahkan ikon dan tombol di sisi kanan AppBar
+          
+          // Ikon Home dengan tulisan "Home"
+          IconButton(
+            icon: const Icon(Icons.home, color: Colors.pink), // Ikon rumah
+            onPressed: () {}, // Fungsi yang akan dijalankan saat ikon ditekan (kosong)
+            tooltip: "Home", // Tooltip yang muncul ketika ikon di-hover atau diketuk
+          ),
+          
+          // Ikon Keranjang dengan tulisan "Data Produk"
+          IconButton(
+            icon: const Icon(Icons.shopping_cart, color: Colors.pink), // Ikon keranjang
+            onPressed: () {}, // Fungsi yang akan dijalankan saat ikon ditekan (kosong)
+            tooltip: "Data Produk", // Tooltip yang muncul ketika ikon di-hover atau diketuk
+          ),
+          
+          // Tombol Logout
+          IconButton(
+            icon: const Icon(Icons.logout, color: Colors.pink), // Ikon logout
+            onPressed: () {
+              // Menampilkan dialog konfirmasi logout ketika ikon logout ditekan
+              showDialog(
+                context: context,
+                builder: (BuildContext context) {
+                  return AlertDialog(
+                    title: const Text("Konfirmasi Logout"), // Judul dialog
+                    content: const Text("Apakah Anda yakin ingin melogout?"), // Pesan dalam dialog
+                    actions: <Widget>[
+                      // Tombol-tombol dalam dialog
+                      TextButton(
+                        onPressed: () {
+                          // Menutup dialog jika pengguna memilih Batal
+                          Navigator.of(context).pop();
+                        },
+                        child: const Text("Batal"), // Teks pada tombol Batal
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          // Menavigasi pengguna ke halaman login jika memilih Ya
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(builder: (context) => LoginScreen()),
+                          );
+                        },
+                        child: const Text("Ya"), // Teks pada tombol Ya
+                      ),
+                    ],
+                  );
+                },
               );
             },
+            tooltip: "Logout",
           ),
         ],
       ),
-      body: Container(  // Kontainer utama untuk tubuh halaman
-        padding: const EdgeInsets.all(20),  // Memberikan padding sekitar kontainer
-        decoration: const BoxDecoration(  // Desain latar belakang dengan gradasi warna
-          gradient: LinearGradient(
-            colors: [Color(0xFFB0C4F5), Color(0xFF8993C9)],  // Warna gradasi latar belakang
-            begin: Alignment.topLeft,  // Titik awal gradasi di pojok kiri atas
-            end: Alignment.bottomRight,  // Titik akhir gradasi di pojok kanan bawah
-          ),
-        ),
-        child: ListView.builder(  // Membuat list yang dapat digulir
-          itemCount: cakeData.length,  // Jumlah item berdasarkan panjang list cakeData
-          itemBuilder: (context, index) {  // Fungsi untuk membangun setiap item di dalam list
-            return Card(  // Membungkus setiap item dalam card untuk tampilan yang lebih menarik
-              margin: const EdgeInsets.symmetric(vertical: 10),  // Memberikan jarak vertikal antar card
-              shape: RoundedRectangleBorder(  // Membuat sudut card menjadi melengkung
-                borderRadius: BorderRadius.circular(15),  // Mengatur radius sudut
-              ),
-              elevation: 5,  // Memberikan efek bayangan pada card
-              child: ListTile(  // Membuat tile dalam card untuk setiap item
-                title: Text(cakeData[index]['name'] ?? ''),  // Menampilkan nama kue
-                subtitle: Text('Price: ${cakeData[index]['price']}'),  // Menampilkan harga kue
-                leading: const Icon(Icons.cake, color: Color(0xFF8993C9)),  // Ikon kue di sebelah kiri
-                onTap: () {  // Fungsi yang dijalankan saat item dipilih
-                  ScaffoldMessenger.of(context).showSnackBar(  // Menampilkan SnackBar dengan pesan
-                    SnackBar(
-                      content: Text('You tapped on ${cakeData[index]['name']}'),  // Pesan yang ditampilkan
+      
+      body: Container(
+        color: const Color(0xFFFFF5F7), // Warna latar belakang halaman
+        child: Padding(
+          padding: const EdgeInsets.all(16.0), // Memberikan padding di sekeliling body
+          child: GridView.builder(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 4, // Dua kolom per baris
+              crossAxisSpacing: 30, // Jarak horizontal antar kolom
+              mainAxisSpacing: 20, // Jarak vertikal antar baris
+            ),
+            itemCount: 8, // Jumlah item yang ditampilkan dalam grid
+            itemBuilder: (context, index) {
+              // Membangun item dalam grid
+              return Container(
+                width: 60, // Lebar Container yang lebih kecil
+                height: 60, // Tinggi Container yang lebih kecil
+                decoration: BoxDecoration(
+                  color: Colors.white, // Warna latar belakang setiap kartu
+                  borderRadius: BorderRadius.circular(16), // Sudut kartu melengkung
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1), // Warna bayangan kartu
+                      blurRadius: 10, // Efek blur pada bayangan
+                      offset: const Offset(0, 4), // Posisi bayangan
                     ),
-                  );
-                },
-              ),
-            );
-          },
+                  ],
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center, // Menyusun widget secara vertikal di tengah
+                  children: [
+                    const Icon(
+                      Icons.cake, // Ikon kue
+                      color: Colors.pink, // Warna ikon
+                      size: 20, // Ukuran ikon
+                    ),
+                    const SizedBox(height: 4), // Jarak vertikal yang lebih kecil antar ikon dan teks
+                    const Text(
+                      "Red Velvet Cake", // Placeholder nama kue
+                      style: TextStyle(
+                        fontSize: 16, // Ukuran teks
+                        fontWeight: FontWeight.bold, // Gaya teks bold
+                        color: Colors.black54, // Warna teks
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
         ),
       ),
     );
