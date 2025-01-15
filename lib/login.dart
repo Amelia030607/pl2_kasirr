@@ -1,134 +1,136 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class LoginScreen extends StatefulWidget {
   @override
-  _LoginScreenState createState() => _LoginScreenState(); // Membuat state untuk widget ini
+  _LoginScreenState createState() => _LoginScreenState();
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  // Controller untuk kolom email dan password
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
-  
-  // Boolean untuk mengatur visibilitas password
-  bool _obscureText = true;
+  final TextEditingController _emailController = TextEditingController(); // Controller untuk input email
+  final TextEditingController _passwordController = TextEditingController(); // Controller untuk input password
+  bool _obscureText = true; // Untuk mengatur visibilitas password (apakah tersembunyi atau tidak)
 
-  // Data dummy pengguna (email dan password)
-  final List<Map<String, String>> _dummyUsers = [
-    {
-      "email": "amelia@gmail.com",
-      "password": "123456789",
-    },
-    {
-      "email": "admin@gmail.com",
-      "password": "admin123",
-    },
-    {
-      "email": "riski@gmail.com",
-      "password": "riski123",
-    },
-  ];
+  // Fungsi untuk menangani login
+  void _login() async {
+    final email = _emailController.text.trim(); // Mengambil dan membersihkan input email
+    final password = _passwordController.text.trim(); // Mengambil dan membersihkan input password
 
-  // Fungsi untuk menangani proses login
-  void _login() {
-    // Mengambil teks dari kolom email dan password
-    final email = _emailController.text.trim();
-    final password = _passwordController.text.trim();
-
-    // Variabel untuk melacak apakah login berhasil
-    bool isAuthenticated = false;
-
-    // Memeriksa apakah email dan password yang dimasukkan cocok dengan pengguna dalam data dummy
-    for (var user in _dummyUsers) {
-      if (user['email'] == email && user['password'] == password) {
-        isAuthenticated = true; // Pengguna terautentikasi
-        break;
-      }
+    // Validasi jika email atau password kosong
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Email dan password tidak boleh kosong')), // Menampilkan pesan error
+      );
+      return; // Menghentikan proses login
     }
 
-    // Jika autentikasi berhasil, navigasi ke halaman utama
-    if (isAuthenticated) {
-      Navigator.pushReplacementNamed(context, '/home');  // Pindah ke halaman Home
-    } else {
-      // Jika autentikasi gagal, tampilkan pesan kesalahan dengan menggunakan snack bar
+    try {
+      // Query ke tabel user di Supabase untuk mencocokkan email dan password
+      final response = await Supabase.instance.client
+          .from('user') // Tabel `user` di Supabase
+          .select() // Melakukan query SELECT
+          .eq('email', email) // Filter berdasarkan email
+          .eq('password', password) // Filter berdasarkan password
+          .maybeSingle(); // Mengambil 1 data (null jika tidak ditemukan)
+
+      if (response == null) {
+        // Jika data tidak ditemukan (email/password salah)
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Login gagal! Email atau password salah.')), // Pesan login gagal
+        );
+      } else {
+        // Jika data ditemukan (login berhasil)
+        final userData = response; // Data pengguna
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Login berhasil! Selamat datang ${userData['email']}')), // Pesan login berhasil
+        );
+
+        // Navigasi ke halaman Home
+        Navigator.pushReplacementNamed(
+          context,
+          '/home', // Rute halaman Home
+          arguments: userData, // Kirim data pengguna ke halaman berikutnya
+        );
+      }
+    } catch (e) {
+      // Penanganan kesalahan jika query gagal
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Login gagal! Email atau password salah.')),
+        SnackBar(content: Text('Terjadi kesalahan: $e')), // Menampilkan pesan error
       );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Membangun UI widget
     return Scaffold(
-      backgroundColor: Colors.pink.shade100, // Mengatur warna latar belakang layar
+      backgroundColor: Colors.pink.shade100, // Warna latar belakang
       body: Center(
-        child: SingleChildScrollView( // Memungkinkan scroll jika keyboard muncul
+        child: SingleChildScrollView( // Untuk menggulirkan konten jika layar kecil
           child: Container(
-            padding: const EdgeInsets.all(20), // Memberikan padding di sekitar kontainer
-            width: 350, // Lebar kontainer
+            padding: const EdgeInsets.all(20), // Padding di sekitar form
+            width: 350, // Lebar form
             decoration: BoxDecoration(
-              color: Colors.white, // Warna latar belakang kontainer
-              borderRadius: BorderRadius.circular(20), // Sudut bulat pada kontainer
-              boxShadow: [ // Menambahkan bayangan pada kontainer
+              color: Colors.white, // Warna latar belakang form
+              borderRadius: BorderRadius.circular(20), // Membuat sudut form melengkung
+              boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1), // Warna bayangan dengan opasitas
-                  blurRadius: 10, // Jarak blur bayangan
-                  offset: const Offset(0, 5), // Posisi bayangan
+                  color: Colors.black.withOpacity(0.1), // Bayangan form
+                  blurRadius: 10,
+                  offset: const Offset(0, 5),
                 ),
               ],
             ),
             child: Column(
-              mainAxisSize: MainAxisSize.min, // Meminimalkan ukuran kolom
+              mainAxisSize: MainAxisSize.min, // Meminimalkan ukuran kolom agar sesuai konten
               children: [
-                const CircleAvatar( // Avatar lingkaran untuk ikon profil
+                const CircleAvatar(
                   radius: 50,
-                  backgroundColor: Colors.pinkAccent,
+                  backgroundColor: Colors.pinkAccent, // Warna latar belakang avatar
                   child: Icon(
-                    Icons.person,
+                    Icons.person, // Ikon avatar
                     size: 50,
                     color: Colors.white,
                   ),
                 ),
-                const SizedBox(height: 20), // Spasi antara elemen
+                const SizedBox(height: 20), // Jarak antara avatar dan teks
                 const Text(
-                  "WELCOME TO OUR WEBSITE",
+                  "WELCOME TO OUR WEBSITE", // Teks sambutan
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: Colors.pinkAccent,
+                    color: Colors.pinkAccent, // Warna teks
                   ),
                 ),
-                const SizedBox(height: 20), // Spasi antara elemen
+                const SizedBox(height: 20), // Jarak antara teks dan form email
                 TextField(
-                  controller: _emailController, // Controller untuk kolom email
+                  controller: _emailController, // Controller untuk input email
                   decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.person, color: Colors.pinkAccent), // Ikon sebelum kolom input
-                    hintText: 'Username', // Teks placeholder
+                    prefixIcon: const Icon(Icons.person, color: Colors.pinkAccent), // Ikon input email
+                    hintText: 'Email', // Placeholder untuk email
                     filled: true,
-                    fillColor: Colors.pink.shade50, // Warna latar belakang kolom input
+                    fillColor: Colors.pink.shade50, // Warna latar belakang input
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10), // Sudut bulat untuk kolom input
-                      borderSide: BorderSide.none, // Tanpa garis tepi
+                      borderRadius: BorderRadius.circular(10), // Membuat sudut input melengkung
+                      borderSide: BorderSide.none, // Menghilangkan border
                     ),
                   ),
                 ),
-                const SizedBox(height: 16), // Spasi antara elemen
+                const SizedBox(height: 16), // Jarak antara form email dan password
                 TextField(
-                  controller: _passwordController, // Controller untuk kolom password
-                  obscureText: _obscureText, // Mengatur apakah password terlihat atau tidak
+                  controller: _passwordController, // Controller untuk input password
+                  obscureText: _obscureText, // Mengatur apakah password tersembunyi
                   decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.lock, color: Colors.pinkAccent), // Ikon sebelum kolom input
-                    hintText: 'Password', // Teks placeholder
+                    prefixIcon: const Icon(Icons.lock, color: Colors.pinkAccent), // Ikon input password
+                    hintText: 'Password', // Placeholder untuk password
                     filled: true,
-                    fillColor: Colors.pink.shade50, // Warna latar belakang kolom input
+                    fillColor: Colors.pink.shade50, // Warna latar belakang input
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10), // Sudut bulat untuk kolom input
-                      borderSide: BorderSide.none, // Tanpa garis tepi
+                      borderRadius: BorderRadius.circular(10), // Membuat sudut input melengkung
+                      borderSide: BorderSide.none, // Menghilangkan border
                     ),
                     suffixIcon: IconButton(
                       icon: Icon(
-                        _obscureText ? Icons.visibility_off : Icons.visibility, // Ikon toggle visibilitas password
+                        _obscureText ? Icons.visibility_off : Icons.visibility, // Ikon visibilitas password
                         color: Colors.pinkAccent,
                       ),
                       onPressed: () {
@@ -139,20 +141,20 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 20), // Spasi antara elemen
+                const SizedBox(height: 20), // Jarak antara input password dan tombol login
                 SizedBox(
-                  width: double.infinity, // Membuat lebar tombol memenuhi ruang yang tersedia
+                  width: double.infinity, // Membuat tombol memenuhi lebar form
                   child: ElevatedButton(
-                    onPressed: _login, // Memanggil fungsi login saat tombol ditekan
+                    onPressed: _login, // Fungsi login akan dipanggil saat tombol diklik
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.pinkAccent, // Warna tombol
+                      backgroundColor: Colors.pinkAccent, // Warna tombol login
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10), // Sudut bulat untuk tombol
+                        borderRadius: BorderRadius.circular(10), // Membuat sudut tombol melengkung
                       ),
-                      padding: const EdgeInsets.symmetric(vertical: 15), // Padding vertikal untuk tombol
+                      padding: const EdgeInsets.symmetric(vertical: 15), // Padding vertikal tombol
                     ),
                     child: const Text(
-                      'LOGIN',
+                      'LOGIN', // Teks pada tombol login
                       style: TextStyle(fontSize: 16, color: Colors.white), // Gaya teks tombol
                     ),
                   ),
