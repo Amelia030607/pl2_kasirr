@@ -1,179 +1,88 @@
-import 'package:flutter/material.dart'; 
-import 'package:supabase_flutter/supabase_flutter.dart'; 
+import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'login.dart';
 
-class HomeScreen extends StatefulWidget { // Membuat widget HomeScreen dengan parameter username.
+class HomeScreen extends StatefulWidget {
+  // Menerima parameter username dari halaman sebelumnya
   final String username;
-  const HomeScreen({required this.username}); // Konstruktor untuk menerima username.
+
+  const HomeScreen({required this.username});
 
   @override
-  _HomeScreenState createState() => _HomeScreenState(); // Membuat instance dari state untuk HomeScreen.
+  _HomeScreenState createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> { // State untuk HomeScreen.
-  final SupabaseClient _supabase = Supabase.instance.client; // Inisialisasi Supabase Client untuk mengakses database.
+class _HomeScreenState extends State<HomeScreen> {
+  // Membuat instance SupabaseClient untuk mengakses database
+  final SupabaseClient _supabase = Supabase.instance.client;
 
-  final TextEditingController _namaProdukController = TextEditingController(); // Controller untuk nama produk.
-  final TextEditingController _hargaController = TextEditingController(); // Controller untuk harga produk.
-  final TextEditingController _stokController = TextEditingController(); // Controller untuk stok produk.
+  // Menyimpan index halaman yang aktif
+  int _currentIndex = 0;
 
-  int _currentIndex = 0; // Menyimpan index tab yang aktif (produk atau tambah produk).
-  int? _selectedProductId; // Menyimpan id produk yang sedang diedit.
-
-  // Fungsi untuk menambah produk baru.
-  Future<void> _addProduct() async {
-    final namaProduk = _namaProdukController.text.trim(); // Mendapatkan nama produk.
-    final harga = double.tryParse(_hargaController.text.trim()); // Mendapatkan harga dan mencoba mengonversinya ke double.
-    final stok = int.tryParse(_stokController.text.trim()); // Mendapatkan stok dan mencoba mengonversinya ke integer.
-
-    // Validasi input.
-    if (namaProduk.isEmpty || harga == null || stok == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Mohon isi semua data dengan benar!')), // Menampilkan pesan jika input tidak valid.
-      );
-      return; // Jika input tidak valid, keluar dari fungsi.
-    }
-
-    try {
-      // Menambahkan data produk ke database Supabase.
-      await _supabase.from('produk').insert({
-        'namaproduk': namaProduk,
-        'harga': harga,
-        'stok': stok,
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Produk berhasil ditambahkan!')), // Menampilkan pesan sukses.
-      );
-
-      // Mengosongkan controller setelah menambah produk.
-      _namaProdukController.clear();
-      _hargaController.clear();
-      _stokController.clear();
-
-      // Pindah ke halaman produk (menggunakan pushReplacement).
-      setState(() {
-        _currentIndex = 0; // Ganti tab ke daftar produk.
-      });
-    } catch (e) {
-      // Menangani error jika terjadi masalah saat menambah produk.
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal menambahkan produk: $e')), // Menampilkan pesan error.
-      );
-    }
-  }
-
-  // Fungsi untuk memperbarui data produk.
-  Future<void> _updateProduct(int productId) async {
-    final namaProduk = _namaProdukController.text.trim();
-    final harga = double.tryParse(_hargaController.text.trim());
-    final stok = int.tryParse(_stokController.text.trim());
-
-    // Validasi input.
-    if (namaProduk.isEmpty || harga == null || stok == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Mohon isi semua data dengan benar!')), // Menampilkan pesan jika input tidak valid.
-      );
-      return;
-    }
-
-    try {
-      // Mengupdate data produk di database Supabase berdasarkan id.
-      await _supabase.from('produk').update({
-        'namaproduk': namaProduk,
-        'harga': harga,
-        'stok': stok,
-      }).eq('id_produk', productId); // Menggunakan eq untuk memilih produk berdasarkan id.
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Produk berhasil diperbarui!')), // Menampilkan pesan sukses.
-      );
-
-      // Mengosongkan controller setelah memperbarui produk.
-      _namaProdukController.clear();
-      _hargaController.clear();
-      _stokController.clear();
-      setState(() {
-        _selectedProductId = null; // Reset id produk yang sedang diedit.
-        _currentIndex = 0; // Kembali ke halaman daftar produk.
-      });
-    } catch (e) {
-      // Menangani error saat memperbarui produk.
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal memperbarui produk: $e')), // Menampilkan pesan error.
-      );
-    }
-  }
-
-  // Fungsi untuk menghapus produk.
-  Future<void> _deleteProduct(int productId) async {
-    try {
-      // Menghapus produk dari database Supabase berdasarkan id.
-      await _supabase.from('produk').delete().eq('id_produk', productId);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Produk berhasil dihapus!')), // Menampilkan pesan sukses.
-      );
-      setState(() {}); // Refresh daftar produk setelah penghapusan.
-    } catch (e) {
-      // Menangani error saat menghapus produk.
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal menghapus produk: $e')), // Menampilkan pesan error.
-      );
-    }
-  }
-
-  // Fungsi untuk mengambil data produk dari database.
+  // Fungsi untuk mengambil data produk dari Supabase
   Future<List<Map<String, dynamic>>> _fetchProducts() async {
     try {
-      // Mengambil data produk dari Supabase.
-      final response = await _supabase.from('produk').select();
+      // Mengambil data produk dari tabel 'produk' di Supabase
+      final response = await _supabase
+          .from('produk')
+          .select()
+          .order('id_produk', ascending: true);
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
-      // Menangani error saat mengambil data produk.
+      // Menampilkan pesan error jika gagal mengambil data
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal memuat produk: $e')), // Menampilkan pesan error.
+        SnackBar(content: Text('Gagal memuat produk: $e')),
       );
       return [];
     }
   }
 
-  // Fungsi untuk membangun daftar produk.
+  // Widget untuk menampilkan daftar produk dalam bentuk ListView
   Widget _buildProductList() {
-    return FutureBuilder<List<Map<String, dynamic>>>( // Menggunakan FutureBuilder untuk menunggu data produk.
-      future: _fetchProducts(), // Mengambil produk dari database.
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: _fetchProducts(),
       builder: (context, snapshot) {
+        // Menampilkan loading indicator saat data sedang diambil
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator()); // Menampilkan indikator loading saat data masih diambil.
-        } else if (snapshot.hasError) {
-          return Center(child: Text('Error: ${snapshot.error}')); // Menampilkan pesan error jika terjadi masalah.
-        } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return const Center(child: Text('Tidak ada produk.')); // Menampilkan pesan jika tidak ada data produk.
+          return const Center(child: CircularProgressIndicator());
+        } 
+        // Menampilkan error jika terjadi kesalahan
+        else if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
+        } 
+        // Menampilkan pesan jika tidak ada produk
+        else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return const Center(child: Text('Tidak ada produk.'));
         }
 
-        final products = snapshot.data!; // Mengambil data produk dari snapshot.
-        return ListView.builder( // Menampilkan daftar produk dalam ListView.
-          itemCount: products.length, // Jumlah produk.
+        final products = snapshot.data!; // Mengambil data produk
+
+        // Menampilkan produk dalam bentuk ListView
+        return ListView.builder(
+          itemCount: products.length,
           itemBuilder: (context, index) {
-            final product = products[index]; // Mengambil produk berdasarkan index.
-            return Card( // Menampilkan card untuk setiap produk.
+            final product = products[index];
+            return Card(
               elevation: 5,
               margin: const EdgeInsets.symmetric(vertical: 5),
-              child: ListTile( // Menampilkan data produk dalam ListTile.
+              child: ListTile(
                 title: Text(product['namaproduk']),
                 subtitle: Text('Harga: ${product['harga']} | Stok: ${product['stok']}'),
-                trailing: Row( // Menambahkan ikon untuk edit dan delete produk.
+                trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    // Tombol untuk mengedit produk
                     IconButton(
                       icon: const Icon(Icons.edit),
                       onPressed: () {
-                        _showEditDialog(product); // Menampilkan dialog edit produk.
+                        _showEditDialog(product);
                       },
                     ),
+                    // Tombol untuk menghapus produk
                     IconButton(
                       icon: const Icon(Icons.delete),
                       onPressed: () {
-                        _showDeleteConfirmation(product['id_produk']); // Menampilkan konfirmasi hapus produk.
+                        _showDeleteConfirmation(product['id_produk']);
                       },
                     ),
                   ],
@@ -186,11 +95,39 @@ class _HomeScreenState extends State<HomeScreen> { // State untuk HomeScreen.
     );
   }
 
-  // Fungsi untuk menampilkan dialog edit produk.
+  // Widget untuk halaman transaksi yang sedang dalam pengembangan
+  Widget _buildTransactionPage() {
+    return const Center(
+      child: Text('Halaman Transaksi dalam pengembangan!'),
+    );
+  }
+
+  // Widget untuk halaman profil yang menampilkan nama pengguna
+  Widget _buildProfilePage() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(
+            Icons.account_circle,
+            size: 100,
+            color: Colors.pinkAccent,
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'Selamat datang, ${widget.username}',
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Fungsi untuk menampilkan dialog edit produk
   void _showEditDialog(Map<String, dynamic> product) {
-    _namaProdukController.text = product['namaproduk'];
-    _hargaController.text = product['harga'].toString();
-    _stokController.text = product['stok'].toString();
+    final TextEditingController _namaProdukController = TextEditingController(text: product['namaproduk']);
+    final TextEditingController _hargaController = TextEditingController(text: product['harga'].toString());
+    final TextEditingController _stokController = TextEditingController(text: product['stok'].toString());
 
     showDialog(
       context: context,
@@ -219,16 +156,18 @@ class _HomeScreenState extends State<HomeScreen> { // State untuk HomeScreen.
             ],
           ),
           actions: [
+            // Tombol untuk membatalkan perubahan
             TextButton(
               onPressed: () {
-                Navigator.pop(context); // Menutup dialog tanpa menyimpan perubahan.
+                Navigator.pop(context);
               },
               child: const Text('Batal'),
             ),
+            // Tombol untuk menyimpan perubahan
             ElevatedButton(
               onPressed: () {
-                _updateProduct(product['id_produk']); // Memperbarui produk.
-                Navigator.pop(context); // Menutup dialog setelah update.
+                _updateProduct(product['id_produk'], _namaProdukController.text, _hargaController.text, _stokController.text);
+                Navigator.pop(context);
               },
               child: const Text('Perbarui Data'),
             ),
@@ -238,7 +177,40 @@ class _HomeScreenState extends State<HomeScreen> { // State untuk HomeScreen.
     );
   }
 
-  // Fungsi untuk menampilkan konfirmasi hapus produk.
+  // Fungsi untuk memperbarui produk di database
+  Future<void> _updateProduct(int productId, String namaProduk, String harga, String stok) async {
+    final hargaParsed = double.tryParse(harga);
+    final stokParsed = int.tryParse(stok);
+
+    // Validasi input pengguna
+    if (namaProduk.isEmpty || hargaParsed == null || stokParsed == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Mohon isi semua data dengan benar!')),
+      );
+      return;
+    }
+
+    try {
+      // Melakukan update data produk di database
+      await _supabase.from('produk').update({
+        'namaproduk': namaProduk,
+        'harga': hargaParsed,
+        'stok': stokParsed,
+      }).eq('id_produk', productId);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Produk berhasil diperbarui!')),
+      );
+      setState(() {}); // Memperbarui tampilan
+    } catch (e) {
+      // Menampilkan pesan error jika gagal update
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal memperbarui produk: $e')),
+      );
+    }
+  }
+
+  // Fungsi untuk menampilkan konfirmasi penghapusan produk
   void _showDeleteConfirmation(int productId) {
     showDialog(
       context: context,
@@ -249,14 +221,14 @@ class _HomeScreenState extends State<HomeScreen> { // State untuk HomeScreen.
           actions: <Widget>[
             TextButton(
               onPressed: () {
-                Navigator.pop(context); // Menutup dialog.
+                Navigator.pop(context);
               },
               child: const Text('Batal'),
             ),
             TextButton(
               onPressed: () {
-                _deleteProduct(productId); // Menghapus produk.
-                Navigator.pop(context); // Menutup dialog setelah menghapus.
+                _deleteProduct(productId);
+                Navigator.pop(context);
               },
               child: const Text('Hapus'),
             ),
@@ -266,53 +238,112 @@ class _HomeScreenState extends State<HomeScreen> { // State untuk HomeScreen.
     );
   }
 
-  // Fungsi untuk membangun form tambah atau update produk.
-  Widget _buildAddProductForm() {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        children: [
-          TextField(
-            controller: _namaProdukController,
-            decoration: const InputDecoration(
-              labelText: 'Nama Produk',
-              border: OutlineInputBorder(),
-            ),
+  // Fungsi untuk menghapus produk dari database
+  Future<void> _deleteProduct(int productId) async {
+    try {
+      await _supabase.from('produk').delete().eq('id_produk', productId);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Produk berhasil dihapus!')),
+      );
+      setState(() {});
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal menghapus produk: $e')),
+      );
+    }
+  }
+
+  // Fungsi untuk menampilkan dialog menambah produk
+  void _showAddProductDialog() {
+    final TextEditingController _namaProdukController = TextEditingController();
+    final TextEditingController _hargaController = TextEditingController();
+    final TextEditingController _stokController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Tambah Produk'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: _namaProdukController,
+                decoration: const InputDecoration(labelText: 'Nama Produk'),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _hargaController,
+                decoration: const InputDecoration(labelText: 'Harga'),
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _stokController,
+                decoration: const InputDecoration(labelText: 'Stok'),
+                keyboardType: TextInputType.number,
+              ),
+            ],
           ),
-          const SizedBox(height: 10),
-          TextField(
-            controller: _hargaController,
-            decoration: const InputDecoration(
-              labelText: 'Harga',
-              border: OutlineInputBorder(),
+          actions: [
+            // Tombol untuk membatalkan penambahan produk
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: const Text('Batal'),
             ),
-            keyboardType: TextInputType.number,
-          ),
-          const SizedBox(height: 10),
-          TextField(
-            controller: _stokController,
-            decoration: const InputDecoration(
-              labelText: 'Stok',
-              border: OutlineInputBorder(),
+            // Tombol untuk menyimpan produk
+            ElevatedButton(
+              onPressed: () {
+                _addProduct(
+                  _namaProdukController.text,
+                  _hargaController.text,
+                  _stokController.text,
+                );
+                Navigator.pop(context);
+              },
+              child: const Text('Tambah Produk'),
             ),
-            keyboardType: TextInputType.number,
-          ),
-          const SizedBox(height: 20),
-          ElevatedButton(
-            onPressed: _selectedProductId == null
-                ? _addProduct
-                : () => _updateProduct(_selectedProductId!), // Menambah atau memperbarui produk.
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.pinkAccent, // Warna tombol.
-            ),
-            child: Text(_selectedProductId == null ? 'Tambah Produk' : 'Perbarui Produk'),
-          ),
-        ],
-      ),
+          ],
+        );
+      },
     );
   }
 
-  // Fungsi untuk menampilkan konfirmasi logout.
+  // Fungsi untuk menambahkan produk ke database
+  Future<void> _addProduct(String namaProduk, String harga, String stok) async {
+    final hargaParsed = double.tryParse(harga);
+    final stokParsed = int.tryParse(stok);
+
+    // Validasi input pengguna
+    if (namaProduk.isEmpty || hargaParsed == null || stokParsed == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Mohon isi semua data dengan benar!')),
+      );
+      return;
+    }
+
+    try {
+      // Menambahkan produk ke database
+      await _supabase.from('produk').insert({
+        'namaproduk': namaProduk,
+        'harga': hargaParsed,
+        'stok': stokParsed,
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Produk berhasil ditambahkan!')),
+      );
+      setState(() {});
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal menambahkan produk: $e')),
+      );
+    }
+  }
+
+  // Fungsi untuk menampilkan konfirmasi logout
   void _showLogoutConfirmation() {
     showDialog(
       context: context,
@@ -323,15 +354,16 @@ class _HomeScreenState extends State<HomeScreen> { // State untuk HomeScreen.
           actions: <Widget>[
             TextButton(
               onPressed: () {
-                Navigator.pop(context); // Menutup dialog.
+                Navigator.pop(context);
               },
               child: const Text('Batal'),
             ),
             TextButton(
               onPressed: () {
+                // Pindah ke halaman login jika logout
                 Navigator.pushReplacement(
                   context,
-                  MaterialPageRoute(builder: (context) => LoginScreen()), // Navigasi ke halaman login.
+                  MaterialPageRoute(builder: (context) => LoginScreen()),
                 );
               },
               child: const Text('Logout'),
@@ -342,35 +374,53 @@ class _HomeScreenState extends State<HomeScreen> { // State untuk HomeScreen.
     );
   }
 
+  // Widget untuk membangun tampilan halaman utama
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Kasir Cake Shop'),
-        backgroundColor: Colors.pinkAccent, // Warna latar belakang AppBar.
+        backgroundColor: Colors.pinkAccent,
         actions: [
+          // Tombol untuk logout
           IconButton(
-            icon: const Icon(Icons.exit_to_app), // Ikon logout.
-            onPressed: _showLogoutConfirmation, // menampilkan dialog logout.
+            icon: const Icon(Icons.exit_to_app),
+            onPressed: _showLogoutConfirmation,
           ),
         ],
       ),
-      body: _currentIndex == 0 ? _buildProductList() : _buildAddProductForm(), // Tampilkan halaman berdasarkan tab yang dipilih.
+      // Menampilkan halaman yang sesuai dengan index yang dipilih
+      body: _currentIndex == 0
+          ? _buildProductList()
+          : _currentIndex == 1
+              ? _buildTransactionPage()
+              : _buildProfilePage(),
+      // Floating action button untuk menambah produk
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showAddProductDialog,
+        child: const Icon(Icons.add),
+        backgroundColor: Colors.pinkAccent,
+      ),
+      // Bottom navigation bar untuk berpindah antar halaman
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex, // Index tab yang aktif.
+        currentIndex: _currentIndex,
         onTap: (index) {
           setState(() {
-            _currentIndex = index; // Update index tab saat tap.
+            _currentIndex = index;
           });
         },
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.list),
-            label: 'Produk', // Label untuk tab produk.
+            label: 'Produk',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.add),
-            label: 'Tambah Produk', // Label untuk tab tambah produk.
+            icon: Icon(Icons.shopping_cart),
+            label: 'Transaksi',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person),
+            label: 'Profil',
           ),
         ],
       ),
