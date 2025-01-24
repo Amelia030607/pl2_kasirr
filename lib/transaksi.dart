@@ -9,182 +9,226 @@ class TransaksiScreen extends StatefulWidget {
 }
 
 class _TransaksiScreenState extends State<TransaksiScreen> {
-  final SupabaseClient _supabase = Supabase.instance.client;
-  List<Map<String, dynamic>> _produk = [];
-  List<Map<String, dynamic>> _keranjang = [];
+  List<dynamic> _produkList = [];
+  List<Map<String, dynamic>> _selectedProducts = [];
 
   @override
   void initState() {
     super.initState();
-    _fetchProducts();
+    _fetchProduk();
   }
 
-    Future<void> _fetchProducts() async {
+  // Ambil data produk dari Supabase
+  Future<void> _fetchProduk() async {
     try {
-      final response = await _supabase.from('produk').select() ?? [];
-      if (response.isNotEmpty) {
-        setState(() {
-          _produk = List<Map<String, dynamic>>.from(response);
-        });
-      } else {
-        throw Exception('Produk tidak ditemukan');
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal memuat produk: $e')),
-      );
+      final response = await Supabase.instance.client.from('produk').select();
+      setState(() {
+        _produkList = response as List<dynamic>;
+      });
+    } catch (error) {
+      debugPrint('Error fetching produk: $error');
     }
   }
 
-
-  void _addToCart(Map<String, dynamic> product) {
+  // Menambah produk ke daftar transaksi
+  void _addProductToTransaction(dynamic produk, int quantity) {
     setState(() {
-      _keranjang.add(product);
+      _selectedProducts.add({
+        'produk': produk,
+        'quantity': quantity,
+        'total': produk['harga'] * quantity,
+      });
     });
   }
 
-  double _calculateTotal() {
-    return _keranjang.fold(0.0, (total, item) => total + item['harga']);
+  // Menghapus produk dari daftar transaksi
+  void _removeProductFromTransaction(int index) {
+    setState(() {
+      _selectedProducts.removeAt(index);
+    });
   }
 
-  Future<void> _decreaseStock() async {
+  // Menambah transaksi ke database
+  Future<void> _addTransaksi() async {
     try {
-      for (var item in _keranjang) {
-        final response = await _supabase
-            .from('produk')
-            .select('stok')
-            .eq('id_produk', item['id_produk'])
-            .maybeSingle();
+      final totalTransaksi = _selectedProducts.fold<double>(0.0, (sum, item) {
+  // Pastikan 'total' adalah double, jika tidak, ubah dengan casting.
+  return sum + (item['total'] ?? 0.0); // Jika 'total' null, gunakan 0.0
+});
 
-        if (response != null && response['stok'] != null) {
-          final currentStock = response['stok'] as int;
-          final newStock = currentStock - 1;
 
-          if (newStock >= 0) {
-            await _supabase
-                .from('produk')
-                .update({'stok': newStock})
-                .eq('id_produk', item['id_produk']);
-          } else {
-            throw Exception('Stok tidak cukup untuk produk ${item['namaproduk']}');
-          }
-        } else {
-          throw Exception('Produk tidak ditemukan atau stok tidak tersedia');
-        }
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal mengurangi stok: $e')),
-      );
-    }
-  }
+      final response = await Supabase.instance.client.from('transaksi').insert({
+        'total': totalTransaksi,
+        'tanggal': DateTime.now().toIso8601String(),
+      });
 
-  Future<void> _recordTransaction() async {
-    try {
-      bool confirm = await _showConfirmationDialog();
-      if (confirm) {
-        final transactionData = _keranjang.map((item) {
-          return {
-            'id_produk': item['id_produk'],
-            'harga': item['harga'],
-            'jumlah': 1,
-          };
-        }).toList();
+      final transaksiId = response[0]['transaksi_id'];
 
-        await _supabase.from('transaksi').insert(transactionData);
-
-        await _decreaseStock();
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Transaksi berhasil!')),
-        );
-        setState(() {
-          _keranjang.clear();
+      // Menyimpan detail produk yang dibeli
+      for (var item in _selectedProducts) {
+        await Supabase.instance.client.from('detail_transaksi').insert({
+          'transaksi_id': transaksiId,
+          'produk_id': item['produk']['id_produk'],
+          'quantity': item['quantity'],
+          'total': item['total'],
         });
       }
-    } catch (e) {
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal mencatat transaksi: $e')),
+        const SnackBar(content: Text('Transaksi berhasil!')),
+      );
+
+      setState(() {
+        _selectedProducts.clear(); // Mengosongkan daftar produk yang dipilih
+      });
+    } catch (error) {
+      debugPrint('Error adding transaksi: $error');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Terjadi kesalahan, coba lagi.')),
       );
     }
   }
 
-  Future<bool> _showConfirmationDialog() async {
-    bool? confirm = await showDialog<bool>(
+  // Dialog untuk memilih produk dan kuantitas
+  void _showAddProductDialog() {
+    final TextEditingController quantityController = TextEditingController();
+
+    showDialog(
       context: context,
-      builder: (context) {
+      builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('Konfirmasi Pembayaran'),
-          content: const Text('Apakah Anda yakin ingin melanjutkan transaksi?'),
+          title: const Text('Pilih Produk'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButtonFormField<dynamic>(
+                hint: const Text('Pilih Produk'),
+                items: _produkList
+                    .map((produk) => DropdownMenuItem(
+                          value: produk,
+                          child: Text(produk['namaproduk']),
+                        ))
+                    .toList(),
+                onChanged: (produk) {
+                  if (produk != null) {
+                    showDialog(
+                      context: context,
+                      builder: (context) {
+                        return AlertDialog(
+                          title: const Text('Masukkan Kuantitas'),
+                          content: TextField(
+                            controller: quantityController,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(labelText: 'Kuantitas'),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.of(context).pop(),
+                              child: const Text('Batal'),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                final quantity = int.tryParse(quantityController.text);
+                                if (quantity != null && quantity > 0) {
+                                  _addProductToTransaction(produk, quantity);
+                                  Navigator.of(context).pop();
+                                } else {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Masukkan kuantitas yang valid')),
+                                  );
+                                }
+                              },
+                              child: const Text('Tambah'),
+                            ),
+                          ],
+                        );
+                      },
+                    );
+                  }
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // Menampilkan detail transaksi
+  void _showTransactionDetails() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Detail Transaksi'),
+          content: SingleChildScrollView(
+            child: Column(
+              children: _selectedProducts.map((item) {
+                return ListTile(
+                  title: Text(item['produk']['namaproduk']),
+                  subtitle: Text('Kuantitas: ${item['quantity']} - Total: ${item['total']}'),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.delete, color: Colors.red),
+                    onPressed: () {
+                      _removeProductFromTransaction(_selectedProducts.indexOf(item));
+                    },
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Batal'),
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Tutup'),
             ),
             TextButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Konfirmasi'),
+              onPressed: () {
+                _addTransaksi();
+                Navigator.of(context).pop();
+              },
+              child: const Text('Selesaikan Transaksi'),
             ),
           ],
         );
       },
     );
-
-    return confirm ?? false;
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Transaksi Pembelian'),
-      ),
-      body: Column(
-        children: [
-          Expanded(
-            child: ListView.builder(
-              itemCount: _produk.length,
-              itemBuilder: (context, index) {
-                final product = _produk[index];
-                return Card(
-                  margin: const EdgeInsets.symmetric(vertical: 5),
-                  child: ListTile(
-                    title: Text(product['namaproduk']),
-                    subtitle: Text('Harga: ${product['harga']}'),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.add_shopping_cart),
-                      onPressed: () => _addToCart(product),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Keranjang Belanja:', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 10),
-                ..._keranjang.map((item) {
-                  return ListTile(
-                    title: Text(item['namaproduk']),
-                    subtitle: Text('Harga: ${item['harga']}'),
-                  );
-                }).toList(),
-                const SizedBox(height: 20),
-                Text('Total: Rp ${_calculateTotal().toStringAsFixed(2)}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 20),
-                ElevatedButton(
-                  onPressed: _keranjang.isEmpty ? null : _recordTransaction,
-                  child: const Text('Proses Pembayaran'),
+    return Column(
+      children: [
+        ElevatedButton(
+          onPressed: _showAddProductDialog,
+          child: const Text('Pilih Produk'),
+        ),
+        Expanded(
+          child: _selectedProducts.isEmpty
+              ? const Center(child: Text('Belum ada produk yang dipilih.'))
+              : ListView.builder(
+                  itemCount: _selectedProducts.length,
+                  itemBuilder: (context, index) {
+                    final item = _selectedProducts[index];
+                    return ListTile(
+                      title: Text(item['produk']['nama_produk']),
+                      subtitle: Text(
+                          'Kuantitas: ${item['quantity']} - Total: ${item['total']}'),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.delete, color: Colors.red),
+                        onPressed: () {
+                          _removeProductFromTransaction(index);
+                        },
+                      ),
+                    );
+                  },
                 ),
-              ],
-            ),
-          ),
-        ],
-      ),
+        ),
+        ElevatedButton(
+          onPressed: _selectedProducts.isEmpty ? null : _showTransactionDetails,
+          child: const Text('Selesaikan Transaksi'),
+        ),
+      ],
     );
   }
 }

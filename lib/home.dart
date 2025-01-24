@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'login.dart'; // Mengimpor halaman login
 import 'transaksi.dart'; // Mengimpor halaman transaksi
+import 'pelanggan.dart';
 
 class HomeScreen extends StatefulWidget {
   // Menerima parameter username dari halaman sebelumnya
@@ -103,24 +104,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // Widget untuk halaman profil yang menampilkan nama pengguna
-  Widget _buildProfilePage() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(
-            Icons.account_circle, // Ikon untuk profil
-            size: 100,
-            color: Colors.pinkAccent,
-          ),
-          const SizedBox(height: 20),
-          Text(
-            'Selamat datang, ${widget.username}', // Menampilkan nama pengguna dari parameter
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-          ),
-        ],
-      ),
-    );
+  Widget _buildPelangganPage() {
+    return const PelangganScreen();
   }
 
   // Fungsi untuk menampilkan dialog edit produk
@@ -368,7 +353,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ? _buildProductList() // Menampilkan daftar produk
           : _currentIndex == 1
               ? _buildTransactionPage() // Menampilkan halaman transaksi
-              : _buildProfilePage(), // Menampilkan halaman profil
+              : _buildPelangganPage(), // Menampilkan halaman profil
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (index) {
@@ -387,7 +372,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.account_circle),
-            label: 'Profil',
+            label: 'Pelanggan',
           ),
         ],
       ),
