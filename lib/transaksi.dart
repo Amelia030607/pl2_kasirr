@@ -136,9 +136,9 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Transaksi Pembelian'),
-      ),
+      // appBar: AppBar(
+      //   title: const Text('Transaksi Pembelian'),
+      // ),
       body: Column(
         children: [
           Expanded(
