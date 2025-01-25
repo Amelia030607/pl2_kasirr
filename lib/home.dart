@@ -100,7 +100,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // Fungsi untuk halaman transaksi yang sudah dibuat di transaksi.dart
   Widget _buildTransactionPage() {
-    return const TransaksiScreen(); // Mengembalikan widget halaman transaksi
+    return TransaksiScreen(); // Mengembalikan widget halaman transaksi tanpa const
   }
 
   // Widget untuk halaman profil yang menampilkan nama pengguna
