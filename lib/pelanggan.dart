@@ -99,7 +99,11 @@ class _PelangganScreenState extends State<PelangganScreen> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text(pelangganData == null ? 'Tambah Pelanggan' : 'Edit Pelanggan'),
+          backgroundColor: Colors.pink[50],
+          title: Text(
+            pelangganData == null ? 'Tambah Pelanggan' : 'Edit Pelanggan',
+            style: const TextStyle(color: Colors.pinkAccent),
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -125,7 +129,10 @@ class _PelangganScreenState extends State<PelangganScreen> {
               },
               child: const Text('Batal'),
             ),
-            TextButton(
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.pinkAccent,
+              ),
               onPressed: () {
                 final String nama = namaController.text;
                 final String alamat = alamatController.text;
@@ -155,63 +162,68 @@ class _PelangganScreenState extends State<PelangganScreen> {
     return Scaffold(
       // appBar: AppBar(
       //   title: const Text('Data Pelanggan', style: TextStyle(color: Colors.white)),
-      //   backgroundColor: Color.fromARGB(209, 248, 141, 200),
+      //   backgroundColor: Colors.pinkAccent,
       //   centerTitle: true,
       // ),
-      body: isLoading
-          ? const Center(
-              child: CircularProgressIndicator(),
-            )
-          : pelanggan.isEmpty
-              ? const Center(
-                  child: Text(
-                    'Tidak ada pelanggan!',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+      body: Container(
+        color: Colors.pink[50],
+        child: isLoading
+            ? const Center(
+                child: CircularProgressIndicator(),
+              )
+            : pelanggan.isEmpty
+                ? const Center(
+                    child: Text(
+                      'Tidak ada pelanggan!',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: pelanggan.length,
+                    itemBuilder: (context, index) {
+                      final item = pelanggan[index];
+                      return Card(
+                        color: Colors.white,
+                        elevation: 4,
+                        margin: const EdgeInsets.symmetric(vertical: 8),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: ListTile(
+                          title: Text(
+                            item['nama_pelanggan'] ?? 'Unknown',
+                            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.pinkAccent),
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Alamat: ${item['alamat']}'),
+                              Text('Nomor Telepon: ${item['nomor_telepon']}'),
+                            ],
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.edit, color: Colors.blueAccent),
+                                onPressed: () => _showAddPelangganDialog(pelangganData: item),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.delete, color: Colors.redAccent),
+                                onPressed: () => _deletePelanggan(item['pelangganID']),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
                   ),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: pelanggan.length,
-                  itemBuilder: (context, index) {
-                    final item = pelanggan[index];
-                    return Card(
-                      elevation: 4,
-                      margin: const EdgeInsets.symmetric(vertical: 8),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: ListTile(
-                        title: Text(
-                          item['nama_pelanggan'] ?? 'Unknown',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Alamat: ${item['alamat']}'),
-                            Text('Nomor Telepon: ${item['nomor_telepon']}'),
-                          ],
-                        ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.edit, color: Color.fromARGB(255, 163, 208, 245)),
-                              onPressed: () => _showAddPelangganDialog(pelangganData: item),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.red),
-                              onPressed: () => _deletePelanggan(item['pelangganID']),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showAddPelangganDialog(),
-        child: const Icon(Icons.add, color: Colors.pinkAccent),
+        backgroundColor: Colors.pinkAccent,
+        child: const Icon(Icons.add, color: Colors.white),
       ),
     );
   }

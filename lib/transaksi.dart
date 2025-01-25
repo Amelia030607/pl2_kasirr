@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'penjualan.dart'; 
+
+import 'penjualan.dart';
 
 class TransaksiScreen extends StatefulWidget {
   @override
@@ -17,16 +18,18 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
   @override
   void initState() {
     super.initState();
-    _fetchProducts();  // Mengambil data produk
-    _fetchPelanggan(); // Mengambil data pelanggan
+    _fetchProducts();
+    _fetchPelanggan();
   }
 
-  // Fungsi untuk mengambil data produk
   Future<void> _fetchProducts() async {
     try {
       final response = await _supabase.from('produk').select();
       setState(() {
-        _produk = List<Map<String, dynamic>>.from(response);
+        _produk = List<Map<String, dynamic>>.from(response).map((product) {
+          product['selectedQuantity'] = 1;
+          return product;
+        }).toList();
       });
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -35,7 +38,6 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
     }
   }
 
-  // Fungsi untuk mengambil data pelanggan
   Future<void> _fetchPelanggan() async {
     try {
       final response = await _supabase.from('pelanggan').select();
@@ -49,20 +51,24 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
     }
   }
 
-  // Menambahkan produk ke keranjang belanja
   void _addToCart(Map<String, dynamic> product, int quantity) {
+    if (product['stok'] == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Maaf, stok habis untuk produk: ${product['namaproduk']}')),
+      );
+      return;
+    }
     setState(() {
       product['quantity'] = quantity;
       _keranjang.add(product);
     });
   }
 
-  // Menghitung total harga transaksi
   double _calculateTotal() {
-    return _keranjang.fold(0.0, (sum, item) => sum + (item['harga'] * item['quantity']));
+    return _keranjang.fold(
+        0.0, (sum, item) => sum + (item['harga'] * item['quantity']));
   }
 
-  // Fungsi untuk mencatat transaksi
   Future<void> _recordTransaction() async {
     if (_selectedPelangganID == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -72,48 +78,48 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
     }
 
     try {
-      final transactionData = _keranjang.map((item) {
-        return {
-          'id_produk': item['id_produk'],
-          'harga': item['harga'],
-          'totalharga': item['totalharga'],
-          'pelangganID': _selectedPelangganID,
-        };
-      }).toList();
-
-      // Menyimpan transaksi ke tabel transaksi
-      final responseTransaksi = await _supabase.from('transaksi').insert(transactionData);
-      if (responseTransaksi.error != null) {
-        throw responseTransaksi.error!.message;
-      }
-
-      // Menyimpan penjualan ke tabel penjualan
       final totalPrice = _calculateTotal();
       final penjualanData = {
         'tanggalpenjualan': DateTime.now().toIso8601String(),
         'totalharga': totalPrice,
         'pelangganID': _selectedPelangganID,
       };
-      final responsePenjualan = await _supabase.from('penjualan').insert(penjualanData);
-      if (responsePenjualan.error != null) {
-        throw responsePenjualan.error!.message;
+
+      final responsePenjualan = await _supabase
+          .from('penjualan')
+          .insert(penjualanData)
+          .select();
+
+      if (responsePenjualan.isEmpty) {
+        throw 'Gagal mencatat data penjualan';
       }
 
-      // Mengurangi stok setelah transaksi
+      final penjualanID = responsePenjualan[0]['penjualanID'];
+
+      final detailTransaksi = _keranjang.map((item) {
+        return {
+          'penjualanID': penjualanID,
+          'id_produk': item['id_produk'],
+          'Jumlahproduk': item['quantity'],
+          'Subtotal': item['harga'] * item['quantity'],
+        };
+      }).toList();
+
+      await _supabase.from('detailpenjualan').insert(detailTransaksi);
+
       await _decreaseStock();
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Transaksi berhasil!')),
       );
 
-      // Navigasi ke PenjualanScreen setelah transaksi selesai
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => PenjualanScreen()),
       );
 
       setState(() {
-        _keranjang.clear(); // Mengosongkan keranjang setelah transaksi
+        _keranjang.clear();
       });
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -122,21 +128,15 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
     }
   }
 
-  // Fungsi untuk mengurangi stok produk setelah transaksi
   Future<void> _decreaseStock() async {
     for (var item in _keranjang) {
       try {
         final id_produk = item['id_produk'];
         final quantity = item['quantity'];
-        
-        // Mengupdate stok produk dengan query biasa
-        final response = await _supabase.from('produk').update({
-          'stok': (item['stok'] - quantity),
-        }).eq('id_produk', id_produk);
 
-        if (response.error != null) {
-          throw response.error!.message;
-        }
+        await _supabase.from('produk').update({
+          'stok': item['stok'] - quantity,
+        }).eq('id_produk', id_produk);
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Gagal mengurangi stok untuk produk: ${item['namaproduk']}')),
@@ -147,127 +147,158 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final Color headerColor = Color.fromARGB(255, 255, 255, 255); // Warna header utama
+    final Color softPinkAccent = Colors.pink[50]!; // Warna latar belakang yang senada
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Transaksi'),
-        actions: [
-          // Tombol icon untuk menuju riwayat penjualan
-          IconButton(
-            icon: const Icon(Icons.history),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => PenjualanScreen()),
-              );
-            },
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // Dropdown untuk memilih pelanggan
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: DropdownButton<int>(
-              value: _selectedPelangganID,
-              hint: const Text('Pilih Pelanggan'),
-              isExpanded: true,
-              items: _pelanggan.map((pelanggan) {
-                return DropdownMenuItem<int>(
-                  value: pelanggan['pelangganID'],
-                  child: Text(pelanggan['nama_pelanggan']),
-                );
-              }).toList(),
-              onChanged: (value) {
-                setState(() {
-                  _selectedPelangganID = value;
-                });
-              },
-            ),
-          ),
-          // Daftar produk
-          Expanded(
-            child: ListView.builder(
-              itemCount: _produk.length,
-              itemBuilder: (context, index) {
-                final product = _produk[index];
-                int selectedQuantity = 1; // Jumlah default
-                return Card(
-                  child: ListTile(
-                    title: Text(product['namaproduk']),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+      body: Container(
+        color: softPinkAccent,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: DropdownButtonFormField<int>(
+                value: _selectedPelangganID,
+                hint: const Text(
+                  'Pilih Pelanggan',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: Colors.pink[50], // Latar belakang dropdown
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                dropdownColor: Colors.pink[100], // Warna dropdown
+                isExpanded: true,
+                items: _pelanggan.map((pelanggan) {
+                  return DropdownMenuItem<int>(
+                    value: pelanggan['pelangganID'],
+                    child: Row(
                       children: [
-                        Text('Harga: Rp ${product['harga']}'),
-                        Text('Stok: ${product['stok']}'),
-                        Row(
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.remove),
-                              onPressed: selectedQuantity > 1
-                                  ? () {
-                                      setState(() {
-                                        selectedQuantity--;
-                                      });
-                                    }
-                                  : null,
-                            ),
-                            Text('$selectedQuantity'),
-                            IconButton(
-                              icon: const Icon(Icons.add),
-                              onPressed: selectedQuantity < product['stok']
-                                  ? () {
-                                      setState(() {
-                                        selectedQuantity++;
-                                      });
-                                    }
-                                  : null,
-                            ),
-                          ],
+                        const Icon(Icons.person, color: Colors.pinkAccent), // Ikon pelanggan
+                        const SizedBox(width: 10),
+                        Text(
+                          pelanggan['nama_pelanggan'],
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black87,
+                          ),
                         ),
                       ],
                     ),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.add_shopping_cart),
-                      onPressed: () => _addToCart(product, selectedQuantity),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-          // Bagian keranjang belanja
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Keranjang Belanja:',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 10),
-                // Menampilkan produk di keranjang
-                ..._keranjang.map((item) {
-                  return ListTile(
-                    title: Text(item['namaproduk']),
-                    subtitle: Text('Harga: Rp ${item['harga']} x ${item['totalharga']}'),
                   );
                 }).toList(),
-                const SizedBox(height: 20),
-                // Total harga
-                Text(
-                  'Total: Rp ${_calculateTotal().toStringAsFixed(2)}',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                ElevatedButton(
-                  onPressed: _keranjang.isEmpty ? null : _recordTransaction,
-                  child: const Text('Proses Pembayaran'),
-                ),
-              ],
+                onChanged: (value) {
+                  setState(() {
+                    _selectedPelangganID = value;
+                  });
+                },
+              ),
             ),
-          ),
-        ],
+            Expanded(
+              child: ListView.builder(
+                itemCount: _produk.length,
+                itemBuilder: (context, index) {
+                  final product = _produk[index];
+                  return Card(
+                    color: headerColor,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: ListTile(
+                      title: Text(product['namaproduk'], style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.pinkAccent)),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Harga: Rp ${product['harga']}', style: const TextStyle(color: Color.fromARGB(179, 0, 0, 0))),
+                          Text('Stok: ${product['stok']}', style: const TextStyle(color: Color.fromARGB(179, 5, 5, 5))),
+                          Row(
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.remove, color: Color.fromARGB(255, 245, 127, 182)),
+                                onPressed: product['selectedQuantity'] > 1
+                                    ? () {
+                                        setState(() {
+                                          product['selectedQuantity']--;
+                                        });
+                                      }
+                                    : null,
+                              ),
+                              Text('${product['selectedQuantity']}', style: const TextStyle(color: Color.fromARGB(255, 0, 0, 0))),
+                              IconButton(
+                                icon: const Icon(Icons.add, color: Color.fromARGB(255, 245, 127, 182)),
+                                onPressed: product['selectedQuantity'] < product['stok']
+                                    ? () {
+                                        setState(() {
+                                          product['selectedQuantity']++;
+                                        });
+                                      }
+                                    : null,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.add_shopping_cart, color: Colors.lightBlue),
+                        onPressed: product['stok'] > 0
+                            ? () => _addToCart(product, product['selectedQuantity'])
+                            : null,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Keranjang Belanja:',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                  ),
+                  const SizedBox(height: 10),
+                  ..._keranjang.map((item) {
+                    return ListTile(
+                      title: Text(item['namaproduk']),
+                      subtitle: Text('Harga: Rp ${item['harga']} x ${item['quantity']}'),
+                    );
+                  }).toList(),
+                  const SizedBox(height: 20),
+                  Text(
+                    'Total: Rp ${_calculateTotal().toStringAsFixed(2)}',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+                  ),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: headerColor,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                      ),
+                      onPressed: _keranjang.isEmpty ? null : _recordTransaction,
+                      child: const Text(
+                        'Proses Pembayaran',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
