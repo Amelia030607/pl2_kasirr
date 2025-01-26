@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-//import 'transaksi.dart'; // Pastikan file transaksi.dart diimpor
 
 class PenjualanScreen extends StatefulWidget {
   @override
@@ -21,7 +20,7 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
     try {
       final response = await _supabase
           .from('penjualan')
-          .select('*, pelanggan(pelangganID), detailpenjualan(*)')
+          .select('penjualanID, tanggalpenjualan, pelanggan(pelangganID), totalharga')
           .order('created_at', ascending: false);
 
       setState(() {
@@ -34,23 +33,25 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
     }
   }
 
+  Future<void> _hapusPenjualan(int penjualanID) async {
+    try {
+      await _supabase.from('penjualan').delete().eq('penjualanID', penjualanID);
+      setState(() {
+        _penjualan.removeWhere((penjualan) => penjualan['penjualanID'] == penjualanID);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Penjualan ID $penjualanID berhasil dihapus')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal menghapus penjualan: $e')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // appBar: AppBar(
-      //   backgroundColor: Colors.pink[200],
-      //   title: const Text('Histori Penjualan', style: TextStyle(color: Colors.white)),
-      //   centerTitle: true,
-      //   leading: IconButton(
-      //     icon: const Icon(Icons.arrow_back, color: Colors.white),
-      //     onPressed: () {
-      //       Navigator.pushReplacement(
-      //         context,
-      //         MaterialPageRoute(builder: (context) => TransaksiScreen()),
-      //       ); // Navigasi ke halaman transaksi.dart
-      //     },
-      //   ),
-      // ),
       body: Container(
         color: Colors.pink[50],
         child: _penjualan.isEmpty
@@ -60,7 +61,6 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                 itemBuilder: (context, index) {
                   final penjualan = _penjualan[index];
                   final pelanggan = penjualan['pelanggan'];
-                  final detailPenjualan = List<Map<String, dynamic>>.from(penjualan['detailpenjualan']);
 
                   return Card(
                     margin: const EdgeInsets.all(12.0),
@@ -69,10 +69,7 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                       borderRadius: BorderRadius.circular(15.0),
                     ),
                     elevation: 5,
-                    child: ExpansionTile(
-                      tilePadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                      iconColor: Colors.pink[300],
-                      collapsedIconColor: Colors.pink[300],
+                    child: ListTile(
                       title: Text(
                         'ID Penjualan: ${penjualan['penjualanID']}',
                         style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
@@ -86,30 +83,137 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
                               style: const TextStyle(fontSize: 14, color: Colors.pink)),
                         ],
                       ),
-                      children: [
-                        const Padding(
-                          padding: EdgeInsets.all(8.0),
-                          child: Text(
-                            'Detail Penjualan:',
-                            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.pink, fontSize: 16),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: Icon(Icons.delete, color: Colors.red),
+                            onPressed: () => _hapusPenjualan(penjualan['penjualanID']),
                           ),
-                        ),
-                        ...detailPenjualan.map((detail) {
-                          return ListTile(
-                            title: Text('Produk ID: ${detail['id_produk']}',
-                                style: const TextStyle(fontWeight: FontWeight.bold)),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('Jumlah: ${detail['Jumlahproduk']}',
-                                    style: const TextStyle(fontSize: 14)),
-                                Text('Subtotal: Rp ${detail['Subtotal'].toStringAsFixed(2)}',
-                                    style: const TextStyle(fontSize: 14, color: Colors.pink)),
-                              ],
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.pinkAccent,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8.0),
+                              ),
                             ),
-                          );
-                        }).toList(),
-                      ],
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => DetailTransaksiScreen(
+                                    penjualanID: penjualan['penjualanID'],
+                                  ),
+                                ),
+                              );
+                            },
+                            child: const Text('Lihat Detail'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+      ),
+    );
+  }
+}
+
+class DetailTransaksiScreen extends StatefulWidget {
+  final int penjualanID;
+
+  DetailTransaksiScreen({required this.penjualanID});
+
+  @override
+  _DetailTransaksiScreenState createState() => _DetailTransaksiScreenState();
+}
+
+class _DetailTransaksiScreenState extends State<DetailTransaksiScreen> {
+  final SupabaseClient _supabase = Supabase.instance.client;
+  List<Map<String, dynamic>> _detailPenjualan = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchDetailPenjualan();
+  }
+
+  Future<void> _fetchDetailPenjualan() async {
+    try {
+      final response = await _supabase
+          .from('detailpenjualan')
+          .select('detailID, penjualanID, id_produk, Jumlahproduk, Subtotal')
+          .eq('penjualanID', widget.penjualanID);
+
+      setState(() {
+        _detailPenjualan = List<Map<String, dynamic>>.from(response);
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal memuat detail transaksi: $e')),
+      );
+    }
+  }
+
+  Future<void> _hapusDetail(int detailID) async {
+    try {
+      await _supabase.from('detailpenjualan').delete().eq('detailID', detailID);
+      setState(() {
+        _detailPenjualan.removeWhere((detail) => detail['detailID'] == detailID);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Detail ID $detailID berhasil dihapus')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal menghapus detail transaksi: $e')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.pinkAccent,
+        title: Text('Detail Transaksi: ${widget.penjualanID}'),
+        centerTitle: true,
+      ),
+      body: Container(
+        color: Colors.pink[50],
+        child: _detailPenjualan.isEmpty
+            ? const Center(child: CircularProgressIndicator())
+            : ListView.builder(
+                itemCount: _detailPenjualan.length,
+                itemBuilder: (context, index) {
+                  final detail = _detailPenjualan[index];
+                  return Card(
+                    margin: const EdgeInsets.all(12.0),
+                    color: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(15.0),
+                    ),
+                    elevation: 5,
+                    child: ListTile(
+                      title: Text(
+                        'Detail ID: ${detail['detailID']}',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Penjualan ID: ${detail['penjualanID']}', style: const TextStyle(fontSize: 14)),
+                          Text('Produk ID: ${detail['id_produk']}', style: const TextStyle(fontSize: 14)),
+                          Text('Jumlah: ${detail['Jumlahproduk']}', style: const TextStyle(fontSize: 14)),
+                          Text('Subtotal: Rp ${detail['Subtotal'].toStringAsFixed(2)}',
+                              style: const TextStyle(fontSize: 14, color: Colors.pink)),
+                        ],
+                      ),
+                      trailing: IconButton(
+                        icon: Icon(Icons.delete, color: Colors.red),
+                        onPressed: () => _hapusDetail(detail['detailID']),
+                      ),
                     ),
                   );
                 },
