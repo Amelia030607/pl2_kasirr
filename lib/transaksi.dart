@@ -160,6 +160,15 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
 
   // Fungsi untuk mendaftarkan pelanggan baru
   Future<void> _registerMember(String nama, String alamat, String nomorTelepon) async {
+    // Cek apakah ada inputan yang kosong
+    if (nama.isEmpty || alamat.isEmpty || nomorTelepon.isEmpty) {
+      // Tampilkan pesan jika ada input yang kosong
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Semua field harus diisi!')),
+      );
+      return; // Menghentikan eksekusi jika ada field yang kosong
+    }
+
     try {
       await _supabase.from('pelanggan').insert({
         'nama_pelanggan': nama,
@@ -168,12 +177,15 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
         'created_at': DateTime.now().toIso8601String(),
       });
 
+      // Tampilkan pesan sukses setelah data berhasil disimpan
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Registrasi pelanggan berhasil!')),
       );
 
-      _fetchPelanggan(); // Memuat ulang daftar pelanggan setelah registrasi
+      // Memuat ulang daftar pelanggan setelah registrasi
+      _fetchPelanggan();
     } catch (e) {
+      // Tampilkan pesan gagal jika terjadi error
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Gagal registrasi pelanggan: $e')),
       );
@@ -182,78 +194,88 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
 
   // Fungsi untuk menampilkan dialog registrasi pelanggan
   void _showRegisterDialog() {
+    // Controller untuk setiap inputan (nama, alamat, nomor telepon)
     final TextEditingController namaController = TextEditingController();
     final TextEditingController alamatController = TextEditingController();
     final TextEditingController teleponController = TextEditingController();
 
+    // Menampilkan dialog untuk registrasi pelanggan baru
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: Color(0xFFFEEAF1), // Warna pink soft
+        backgroundColor: Colors.pink[50], 
         title: Text(
           'Registrasi Pelanggan Baru',
-          style: TextStyle(
-            color: Color(0xFFFB7A99), // Warna teks judul pink lembut
-            fontWeight: FontWeight.bold,
-          ),
+          style: TextStyle(color: Colors.pink[900]), 
         ),
         content: Column(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisSize: MainAxisSize.min, // Memastikan kolom memiliki ukuran minimum
           children: [
             TextField(
               controller: namaController,
               decoration: InputDecoration(
-                labelText: 'Nama',
-                labelStyle: TextStyle(color: Color(0xFFFB7A99)), // Warna label pink lembut
-                focusedBorder: UnderlineInputBorder(
-                  borderSide: BorderSide(color: Color(0xFFFB7A99)), // Warna garis bawah pink lembut
-                ),
+                labelText: 'Nama', 
+                labelStyle: TextStyle(color: Colors.pink[700]), 
+                border: OutlineInputBorder(), // Border kotak untuk input
               ),
             ),
-            SizedBox(height: 8),
+            SizedBox(height: 10), // Spasi antar input
+            
+            // Input untuk Alamat
             TextField(
               controller: alamatController,
               decoration: InputDecoration(
-                labelText: 'Alamat',
-                labelStyle: TextStyle(color: Color(0xFFFB7A99)),
-                focusedBorder: UnderlineInputBorder(
-                  borderSide: BorderSide(color: Color(0xFFFB7A99)),
-                ),
+                labelText: 'Alamat', 
+                labelStyle: TextStyle(color: Colors.pink[700]), 
+                border: OutlineInputBorder(), 
               ),
             ),
-            SizedBox(height: 8),
+            SizedBox(height: 10), 
+
+            // Input untuk Nomor Telepon
             TextField(
               controller: teleponController,
               decoration: InputDecoration(
-                labelText: 'Nomor Telepon',
-                labelStyle: TextStyle(color: Color(0xFFFB7A99)),
-                focusedBorder: UnderlineInputBorder(
-                  borderSide: BorderSide(color: Color(0xFFFB7A99)),
-                ),
+                labelText: 'Nomor Telepon', 
+                labelStyle: TextStyle(color: Colors.pink[700]), 
+                border: OutlineInputBorder(), 
               ),
             ),
           ],
         ),
         actions: [
+          // Tombol Batal
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Batal',
-              style: TextStyle(color: Color(0xFFFB7A99)),
+            onPressed: () => Navigator.pop(context), // Menutup dialog saat tombol batal ditekan
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10), // Padding tombol
+              decoration: BoxDecoration(
+                color: Colors.pink[200], 
+                borderRadius: BorderRadius.circular(5), // Membuat sudut tombol membulat
+              ),
+              child: Text(
+                'Batal',
+                style: TextStyle(color: Colors.white), 
+              ),
             ),
           ),
+          // Tombol Simpan
           TextButton(
             onPressed: () {
-              _registerMember(namaController.text, alamatController.text, teleponController.text); // Mendaftarkan pelanggan
-              Navigator.pop(context);
+              // Menyimpan data jika tombol Simpan ditekan
+              _registerMember(namaController.text, alamatController.text, teleponController.text);
+              Navigator.pop(context); // Menutup dialog setelah data disimpan
             },
-            child: Text(
-              'Simpan',
-              style: TextStyle(color: Color(0xFFFFFFFF)), // Warna tombol putih
-            ),
-            style: TextButton.styleFrom(
-              backgroundColor: Color(0xFFFB7A99), // Warna tombol pink lembut
-              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10), 
+              decoration: BoxDecoration(
+                color: Colors.pink[300], 
+                borderRadius: BorderRadius.circular(5), // Membuat sudut tombol membulat
+              ),
+              child: Text(
+                'Simpan',
+                style: TextStyle(color: Colors.white), 
+              ),
             ),
           ),
         ],
