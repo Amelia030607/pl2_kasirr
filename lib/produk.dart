@@ -9,8 +9,10 @@ class ProdukScreen extends StatefulWidget {
 class _ProdukScreenState extends State<ProdukScreen> {
   final SupabaseClient _supabase = Supabase.instance.client;
 
+  // Fungsi untuk mengambil daftar produk dari tabel 'produk' di Supabase
   Future<List<Map<String, dynamic>>> _fetchProducts() async {
     try {
+      // Mengambil data produk dan mengurutkannya berdasarkan id_produk
       final response = await _supabase
           .from('produk')
           .select()
@@ -24,6 +26,7 @@ class _ProdukScreenState extends State<ProdukScreen> {
     }
   }
 
+  // Fungsi untuk menampilkan dialog edit produk
   void _showEditDialog(Map<String, dynamic> product) {
     final TextEditingController _namaProdukController =
         TextEditingController(text: product['namaproduk']);
@@ -62,16 +65,17 @@ class _ProdukScreenState extends State<ProdukScreen> {
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.pop(context);
+                Navigator.pop(context); // Menutup dialog edit
               },
               child: const Text('Batal', style: TextStyle(color: Colors.black54)),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: Colors.pinkAccent),
               onPressed: () {
+                // Memperbarui produk dengan data yang baru
                 _updateProduct(product['id_produk'], _namaProdukController.text,
                     _hargaController.text, _stokController.text);
-                Navigator.pop(context);
+                Navigator.pop(context); // Menutup dialog edit setelah update
               },
               child: const Text('Perbarui Data'),
             ),
@@ -81,10 +85,11 @@ class _ProdukScreenState extends State<ProdukScreen> {
     );
   }
 
+  // Fungsi untuk memperbarui data produk
   Future<void> _updateProduct(
       int productId, String namaProduk, String harga, String stok) async {
-    final hargaParsed = double.tryParse(harga);
-    final stokParsed = int.tryParse(stok);
+    final hargaParsed = double.tryParse(harga); // Parsing harga ke tipe double
+    final stokParsed = int.tryParse(stok); // Parsing stok ke tipe int
 
     if (namaProduk.isEmpty || hargaParsed == null || stokParsed == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -94,6 +99,7 @@ class _ProdukScreenState extends State<ProdukScreen> {
     }
 
     try {
+      // Melakukan update produk di Supabase berdasarkan productId
       await _supabase.from('produk').update({
         'namaproduk': namaProduk,
         'harga': hargaParsed,
@@ -103,7 +109,7 @@ class _ProdukScreenState extends State<ProdukScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Produk berhasil diperbarui!')),
       );
-      setState(() {});
+      setState(() {}); // Memperbarui UI setelah perubahan data
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Gagal memperbarui produk: $e')),
@@ -111,6 +117,7 @@ class _ProdukScreenState extends State<ProdukScreen> {
     }
   }
 
+  // Fungsi untuk menampilkan dialog tambah produk
   void _showAddProductDialog() {
     final TextEditingController _namaProdukController = TextEditingController();
     final TextEditingController _hargaController = TextEditingController();
@@ -146,16 +153,17 @@ class _ProdukScreenState extends State<ProdukScreen> {
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.pop(context);
+                Navigator.pop(context); // Menutup dialog tambah
               },
               child: const Text('Batal', style: TextStyle(color: Colors.black54)),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: Colors.pinkAccent),
               onPressed: () {
+                // Menambahkan produk baru ke database
                 _addProduct(_namaProdukController.text,
                     _hargaController.text, _stokController.text);
-                Navigator.pop(context);
+                Navigator.pop(context); // Menutup dialog tambah setelah insert
               },
               child: const Text('Tambah Produk'),
             ),
@@ -165,9 +173,10 @@ class _ProdukScreenState extends State<ProdukScreen> {
     );
   }
 
+  // Fungsi untuk menambahkan produk ke database
   Future<void> _addProduct(String namaProduk, String harga, String stok) async {
-    final hargaParsed = double.tryParse(harga);
-    final stokParsed = int.tryParse(stok);
+    final hargaParsed = double.tryParse(harga); // Parsing harga ke tipe double
+    final stokParsed = int.tryParse(stok); // Parsing stok ke tipe int
 
     if (namaProduk.isEmpty || hargaParsed == null || stokParsed == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -177,6 +186,7 @@ class _ProdukScreenState extends State<ProdukScreen> {
     }
 
     try {
+      // Menambahkan produk baru ke tabel produk
       await _supabase.from('produk').insert({
         'namaproduk': namaProduk,
         'harga': hargaParsed,
@@ -186,7 +196,7 @@ class _ProdukScreenState extends State<ProdukScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Produk berhasil ditambahkan!')),
       );
-      setState(() {});
+      setState(() {}); // Memperbarui UI setelah produk ditambahkan
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Gagal menambahkan produk: $e')),
@@ -194,13 +204,15 @@ class _ProdukScreenState extends State<ProdukScreen> {
     }
   }
 
+  // Fungsi untuk menghapus produk dari database
   Future<void> _deleteProduct(int productId) async {
     try {
+      // Menghapus produk berdasarkan id_produk
       await _supabase.from('produk').delete().eq('id_produk', productId);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Produk berhasil dihapus!')),
       );
-      setState(() {});
+      setState(() {}); // Memperbarui UI setelah penghapusan produk
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Gagal menghapus produk: $e')),
@@ -213,25 +225,25 @@ class _ProdukScreenState extends State<ProdukScreen> {
     return Scaffold(
       backgroundColor: Colors.pink[50],
       floatingActionButton: FloatingActionButton(
-        onPressed: _showAddProductDialog,
+        onPressed: _showAddProductDialog, // Menampilkan dialog untuk menambah produk
         child: const Icon(Icons.add),
         backgroundColor: Colors.pinkAccent,
         tooltip: 'Tambah Produk',
       ),
-      // appBar: AppBar(
-      //   backgroundColor: Colors.pinkAccent,
-      //   title: const Text('Data Produk', style: TextStyle(color: Colors.white)),
-      //   centerTitle: true,
-      // ),
+      appBar: AppBar(
+        backgroundColor: Colors.pinkAccent,
+        title: const Text('Data Produk', style: TextStyle(color: Colors.white)),
+        centerTitle: true,
+      ),
       body: FutureBuilder<List<Map<String, dynamic>>>(
-        future: _fetchProducts(),
+        future: _fetchProducts(), // Memuat daftar produk
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(child: CircularProgressIndicator()); // Menampilkan loading saat data sedang diambil
           } else if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
+            return Center(child: Text('Error: ${snapshot.error}')); // Menampilkan error jika terjadi kegagalan
           } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text('Tidak ada produk.'));
+            return const Center(child: Text('Tidak ada produk.')); 
           }
 
           final products = snapshot.data!;
@@ -261,13 +273,13 @@ class _ProdukScreenState extends State<ProdukScreen> {
                       IconButton(
                         icon: const Icon(Icons.edit, color: Colors.blueAccent),
                         onPressed: () {
-                          _showEditDialog(product);
+                          _showEditDialog(product); // Menampilkan dialog edit produk
                         },
                       ),
                       IconButton(
                         icon: const Icon(Icons.delete, color: Colors.redAccent),
                         onPressed: () async {
-                          await _deleteProduct(product['id_produk']);
+                          await _deleteProduct(product['id_produk']); // Menghapus produk dari database
                         },
                       ),
                     ],

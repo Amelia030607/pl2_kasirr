@@ -1,95 +1,94 @@
-// Mengimpor paket-paket yang diperlukan
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'penjualan.dart'; // Menyertakan file penjualan.dart untuk navigasi ke halaman penjualan
 
-// Definisi kelas utama TransaksiScreen
 class TransaksiScreen extends StatefulWidget {
   @override
   _TransaksiScreenState createState() => _TransaksiScreenState();
 }
 
-// State untuk TransaksiScreen
 class _TransaksiScreenState extends State<TransaksiScreen> {
-  // Inisialisasi Supabase client untuk komunikasi dengan database
   final SupabaseClient _supabase = Supabase.instance.client;
 
-  // Variabel untuk menyimpan data produk, keranjang, dan pelanggan
-  List<Map<String, dynamic>> _produk = [];
-  List<Map<String, dynamic>> _keranjang = [];
-  List<Map<String, dynamic>> _pelanggan = [];
-  int? _selectedPelangganID; // Variabel untuk menyimpan ID pelanggan yang dipilih
+  List<Map<String, dynamic>> _produk = []; // Daftar produk yang tersedia
+  List<Map<String, dynamic>> _keranjang = []; // Daftar produk yang dipilih oleh pelanggan
+  List<Map<String, dynamic>> _pelanggan = []; // Daftar pelanggan yang terdaftar
+  int? _selectedPelangganID; // ID pelanggan yang dipilih untuk transaksi
+  bool _isPelangganMember = false; // Menandakan apakah pelanggan adalah member
 
   @override
   void initState() {
     super.initState();
-    _fetchProducts(); // Memanggil fungsi untuk mengambil data produk
-    _fetchPelanggan(); // Memanggil fungsi untuk mengambil data pelanggan
+    _fetchProducts(); // Memuat daftar produk
+    _fetchPelanggan(); // Memuat daftar pelanggan
   }
 
-  // Fungsi untuk mengambil data produk dari database Supabase
+  // Fungsi untuk mengambil data produk dari Supabase
   Future<void> _fetchProducts() async {
     try {
-      final response = await _supabase.from('produk').select(); // Query untuk mengambil semua data produk
+      final response = await _supabase.from('produk').select();
       setState(() {
         _produk = List<Map<String, dynamic>>.from(response).map((product) {
-          product['selectedQuantity'] = 1; // Menambahkan atribut quantity untuk produk
+          product['selectedQuantity'] = 1; // Menambahkan kuantitas produk yang dipilih
           return product;
         }).toList();
       });
     } catch (e) {
-      // Menampilkan pesan kesalahan jika gagal mengambil data produk
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Gagal memuat produk: $e')),
       );
     }
   }
 
-  // Fungsi untuk mengambil data pelanggan dari database Supabase
+  // Fungsi untuk mengambil data pelanggan dari Supabase
   Future<void> _fetchPelanggan() async {
     try {
-      final response = await _supabase.from('pelanggan').select(); // Query untuk mengambil data pelanggan
+      final response = await _supabase.from('pelanggan').select();
       setState(() {
-        _pelanggan = List<Map<String, dynamic>>.from(response); // Menyimpan data pelanggan ke dalam variabel
+        _pelanggan = List<Map<String, dynamic>>.from(response);
       });
     } catch (e) {
-      // Menampilkan pesan kesalahan jika gagal mengambil data pelanggan
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Gagal memuat pelanggan: $e')),
       );
     }
   }
 
-  // Fungsi untuk menambahkan produk ke keranjang
+  // Fungsi untuk menambahkan produk ke keranjang belanja
   void _addToCart(Map<String, dynamic> product, int quantity) {
-    if (product['stok'] == 0) { // Mengecek jika stok produk habis
+    if (product['stok'] == 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Maaf, stok habis untuk produk: ${product['namaproduk']}')),
+        SnackBar(content: Text('Stok habis: ${product['namaproduk']}')),
       );
       return;
     }
     setState(() {
-      product['quantity'] = quantity; // Menambahkan atribut quantity ke produk
-      _keranjang.add(product); // Menambahkan produk ke dalam keranjang
+      product['quantity'] = quantity;
+      _keranjang.add(product); // Menambahkan produk ke keranjang
     });
   }
 
-  // Fungsi untuk menghapus produk dari keranjang
+  // Fungsi untuk menghapus produk dari keranjang belanja
   void _removeFromCart(Map<String, dynamic> product) {
     setState(() {
       _keranjang.remove(product); // Menghapus produk dari keranjang
     });
   }
 
-  // Fungsi untuk menghitung total harga dari produk di keranjang
+  // Fungsi untuk menghitung total harga transaksi
   double _calculateTotal() {
-    return _keranjang.fold(
-        0.0, (sum, item) => sum + (item['harga'] * item['quantity']));
+    double total = _keranjang.fold(0.0, (sum, item) {
+      double harga = item['harga'] * item['quantity']; // Menghitung subtotal untuk setiap item
+      if (_isPelangganMember) {
+        harga *= 0.88; // Diskon 12% jika pelanggan adalah member
+      }
+      return sum + harga; // Mengembalikan total harga
+    });
+    return total;
   }
 
-  // Fungsi untuk mencatat transaksi ke dalam database
+  // Fungsi untuk mencatat transaksi setelah pembayaran berhasil
   Future<void> _recordTransaction() async {
-    if (_selectedPelangganID == null) { // Mengecek apakah pelanggan telah dipilih
+    if (_selectedPelangganID == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Silakan pilih pelanggan terlebih dahulu')),
       );
@@ -97,14 +96,13 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
     }
 
     try {
-      final totalPrice = _calculateTotal(); // Menghitung total harga transaksi
+      final totalPrice = _calculateTotal(); // Menghitung total harga
       final penjualanData = {
-        'tanggalpenjualan': DateTime.now().toIso8601String(), // Waktu transaksi
-        'totalharga': totalPrice, // Total harga transaksi
-        'pelangganID': _selectedPelangganID, // ID pelanggan yang melakukan transaksi
+        'tanggalpenjualan': DateTime.now().toIso8601String(),
+        'totalharga': totalPrice,
+        'pelangganID': _selectedPelangganID,
       };
 
-      // Menyimpan data transaksi ke tabel "penjualan"
       final responsePenjualan = await _supabase
           .from('penjualan')
           .insert(penjualanData)
@@ -114,9 +112,8 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
         throw 'Gagal mencatat data penjualan';
       }
 
-      final penjualanID = responsePenjualan[0]['penjualanID']; // Mendapatkan ID transaksi
+      final penjualanID = responsePenjualan[0]['penjualanID'];
 
-      // Menyimpan detail transaksi ke tabel "detailpenjualan"
       final detailTransaksi = _keranjang.map((item) {
         return {
           'penjualanID': penjualanID,
@@ -126,32 +123,24 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
         };
       }).toList();
 
-      await _supabase.from('detailpenjualan').insert(detailTransaksi);
-
+      await _supabase.from('detailpenjualan').insert(detailTransaksi); // Menyimpan detail transaksi
       await _decreaseStock(); // Mengurangi stok produk
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Transaksi berhasil!')),
-      );
-
-      // Menavigasi ke halaman penjualan
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => PenjualanScreen()),
+        const SnackBar(content: Text('Transaksi berhasil! Pembayaran sudah diproses.')),
       );
 
       setState(() {
-        _keranjang.clear(); // Mengosongkan keranjang
+        _keranjang.clear(); // Mengosongkan keranjang belanja setelah transaksi selesai
       });
     } catch (e) {
-      // Menampilkan pesan kesalahan jika transaksi gagal
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Gagal mencatat transaksi: $e')),
       );
     }
   }
 
-  // Fungsi untuk mengurangi stok produk
+  // Fungsi untuk mengurangi stok produk setelah transaksi
   Future<void> _decreaseStock() async {
     for (var item in _keranjang) {
       try {
@@ -159,29 +148,116 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
         final quantity = item['quantity'];
 
         await _supabase.from('produk').update({
-          'stok': item['stok'] - quantity, // Mengurangi stok produk
+          'stok': item['stok'] - quantity, // Mengurangi stok berdasarkan jumlah yang dibeli
         }).eq('id_produk', id_produk);
       } catch (e) {
-        // Menampilkan pesan kesalahan jika stok gagal diperbarui
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Gagal mengurangi stok untuk produk: ${item['namaproduk']}')),
+          SnackBar(content: Text('Gagal mengurangi stok: ${item['namaproduk']}')),
         );
       }
     }
   }
 
+  // Fungsi untuk mendaftarkan pelanggan baru
+  Future<void> _registerMember(String nama, String alamat, String nomorTelepon) async {
+    try {
+      await _supabase.from('pelanggan').insert({
+        'nama_pelanggan': nama,
+        'alamat': alamat,
+        'nomor_telepon': nomorTelepon,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Registrasi pelanggan berhasil!')),
+      );
+
+      _fetchPelanggan(); // Memuat ulang daftar pelanggan setelah registrasi
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal registrasi pelanggan: $e')),
+      );
+    }
+  }
+
+  // Fungsi untuk menampilkan dialog registrasi pelanggan
+  void _showRegisterDialog() {
+    final TextEditingController namaController = TextEditingController();
+    final TextEditingController alamatController = TextEditingController();
+    final TextEditingController teleponController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Registrasi Pelanggan Baru'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(controller: namaController, decoration: InputDecoration(labelText: 'Nama')),
+            TextField(controller: alamatController, decoration: InputDecoration(labelText: 'Alamat')),
+            TextField(controller: teleponController, decoration: InputDecoration(labelText: 'Nomor Telepon')),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: Text('Batal')),
+          TextButton(
+            onPressed: () {
+              _registerMember(namaController.text, alamatController.text, teleponController.text); // Mendaftarkan pelanggan
+              Navigator.pop(context);
+            },
+            child: Text('Simpan'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final Color headerColor = const Color.fromARGB(255, 255, 255, 255); // Warna latar header
-    final Color softPinkAccent = Colors.pink[50]!; // Warna latar utama
+    final Color headerColor = const Color.fromARGB(255, 255, 255, 255);
+    final Color softPinkAccent = Colors.pink[50]!;
 
     return Scaffold(
-      body: SingleChildScrollView( // Membuat halaman dapat di-scroll
+      appBar: AppBar(
+        title: Center(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.people, color: Colors.white),
+              SizedBox(width: 8),
+              RichText(
+                text: TextSpan(
+                  children: [
+                    TextSpan(
+                      text: "DAFTAR ",
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                    TextSpan(
+                      text: "PELANGGAN",
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.yellow),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        backgroundColor: Color.fromARGB(255, 255, 90, 145),
+        actions: [
+          Tooltip(
+            message: "Tambah Pelanggan",
+            child: IconButton(
+              icon: const Icon(Icons.person_add),
+              onPressed: _showRegisterDialog, // Menampilkan dialog registrasi
+            ),
+          ),
+        ],
+      ),
+      body: SingleChildScrollView(
         child: Container(
           color: softPinkAccent,
           child: Column(
             children: [
-              // Dropdown untuk memilih pelanggan
               Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: DropdownButtonFormField<int>(
@@ -224,16 +300,16 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
                   }).toList(),
                   onChanged: (value) {
                     setState(() {
-                      _selectedPelangganID = value; // Menyimpan ID pelanggan yang dipilih
+                      _selectedPelangganID = value;
+                      // Memeriksa apakah pelanggan adalah member
+                      _isPelangganMember = _pelanggan.any((pelanggan) => pelanggan['pelangganID'] == value);
                     });
                   },
                 ),
               ),
-
-              // List produk yang dapat dipilih
               ListView.builder(
                 shrinkWrap: true,
-                physics: NeverScrollableScrollPhysics(), // Menonaktifkan scroll pada ListView produk
+                physics: NeverScrollableScrollPhysics(),
                 itemCount: _produk.length,
                 itemBuilder: (context, index) {
                   final product = _produk[index];
@@ -249,6 +325,13 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
                         children: [
                           Text('Harga: Rp ${product['harga']}', style: const TextStyle(color: Colors.black87)),
                           Text('Stok: ${product['stok']}', style: const TextStyle(color: Colors.black87)),
+                          if (_isPelangganMember) ...[
+                            const SizedBox(height: 5),
+                            Text(
+                              'Anda Mendapat Potongan 12%',
+                              style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
+                            ),
+                          ],
                           Row(
                             children: [
                               IconButton(
@@ -256,7 +339,7 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
                                 onPressed: product['selectedQuantity'] > 1
                                     ? () {
                                         setState(() {
-                                          product['selectedQuantity']--; // Mengurangi quantity produk
+                                          product['selectedQuantity']--;
                                         });
                                       }
                                     : null,
@@ -267,7 +350,7 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
                                 onPressed: product['selectedQuantity'] < product['stok']
                                     ? () {
                                         setState(() {
-                                          product['selectedQuantity']++; // Menambah quantity produk
+                                          product['selectedQuantity']++;
                                         });
                                       }
                                     : null,
@@ -279,15 +362,13 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
                       trailing: IconButton(
                         icon: const Icon(Icons.add_shopping_cart, color: Colors.blueAccent),
                         onPressed: product['stok'] > 0
-                            ? () => _addToCart(product, product['selectedQuantity'])
-                            : null, // Menambahkan produk ke keranjang jika stok tersedia
+                            ? () => _addToCart(product, product['selectedQuantity']) // Menambahkan produk ke keranjang
+                            : null,
                       ),
                     ),
                   );
                 },
               ),
-
-              // Menampilkan keranjang belanja
               Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
@@ -322,7 +403,7 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
                             borderRadius: BorderRadius.circular(20),
                           ),
                         ),
-                        onPressed: _keranjang.isEmpty ? null : _recordTransaction, // Memproses transaksi jika keranjang tidak kosong
+                        onPressed: _keranjang.isEmpty ? null : _recordTransaction, // Menyelesaikan transaksi
                         child: const Text(
                           'Proses Pembayaran',
                           style: TextStyle(color: Colors.white),
