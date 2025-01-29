@@ -106,8 +106,7 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
         title: const Text(
           'Penjualan',
           style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
+            fontSize: 24, 
             color: Colors.white,
           ),
         ),

@@ -231,8 +231,8 @@ class _ProdukScreenState extends State<ProdukScreen> {
         tooltip: 'Tambah Produk',
       ),
       appBar: AppBar(
-        backgroundColor: Colors.pinkAccent,
-        title: const Text('Data Produk', style: TextStyle(color: Colors.white)),
+        backgroundColor: Color.fromARGB(255, 255, 90, 145),
+        title: const Text('Data Produk', style: TextStyle(color: Colors.white, fontSize: 24)),
         centerTitle: true,
       ),
       body: FutureBuilder<List<Map<String, dynamic>>>(
