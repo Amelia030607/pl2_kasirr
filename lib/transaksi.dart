@@ -189,83 +189,72 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: Colors.pink[50],
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        title: Center(
-          child: Text(
-            'Registrasi Pelanggan Baru',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.pinkAccent),
+        backgroundColor: Color(0xFFFEEAF1), // Warna pink soft
+        title: Text(
+          'Registrasi Pelanggan Baru',
+          style: TextStyle(
+            color: Color(0xFFFB7A99), // Warna teks judul pink lembut
+            fontWeight: FontWeight.bold,
           ),
         ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: TextField(
-                  controller: namaController,
-                  decoration: InputDecoration(
-                    labelText: 'Nama',
-                    labelStyle: TextStyle(color: Colors.pinkAccent),
-                    border: OutlineInputBorder(),
-                    filled: true,
-                    fillColor: Colors.white,
-                  ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: namaController,
+              decoration: InputDecoration(
+                labelText: 'Nama',
+                labelStyle: TextStyle(color: Color(0xFFFB7A99)), // Warna label pink lembut
+                focusedBorder: UnderlineInputBorder(
+                  borderSide: BorderSide(color: Color(0xFFFB7A99)), // Warna garis bawah pink lembut
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: TextField(
-                  controller: alamatController,
-                  decoration: InputDecoration(
-                    labelText: 'Alamat',
-                    labelStyle: TextStyle(color: Colors.pinkAccent),
-                    border: OutlineInputBorder(),
-                    filled: true,
-                    fillColor: Colors.white,
-                  ),
+            ),
+            SizedBox(height: 8),
+            TextField(
+              controller: alamatController,
+              decoration: InputDecoration(
+                labelText: 'Alamat',
+                labelStyle: TextStyle(color: Color(0xFFFB7A99)),
+                focusedBorder: UnderlineInputBorder(
+                  borderSide: BorderSide(color: Color(0xFFFB7A99)),
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: TextField(
-                  controller: teleponController,
-                  decoration: InputDecoration(
-                    labelText: 'Nomor Telepon',
-                    labelStyle: TextStyle(color: Colors.pinkAccent),
-                    border: OutlineInputBorder(),
-                    filled: true,
-                    fillColor: Colors.white,
-                  ),
-                  keyboardType: TextInputType.phone,
+            ),
+            SizedBox(height: 8),
+            TextField(
+              controller: teleponController,
+              decoration: InputDecoration(
+                labelText: 'Nomor Telepon',
+                labelStyle: TextStyle(color: Color(0xFFFB7A99)),
+                focusedBorder: UnderlineInputBorder(
+                  borderSide: BorderSide(color: Color(0xFFFB7A99)),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: Text(
               'Batal',
-              style: TextStyle(color: Colors.pinkAccent),
+              style: TextStyle(color: Color(0xFFFB7A99)),
             ),
           ),
-          ElevatedButton(
+          TextButton(
             onPressed: () {
-              _registerMember(namaController.text, alamatController.text, teleponController.text);
+              _registerMember(namaController.text, alamatController.text, teleponController.text); // Mendaftarkan pelanggan
               Navigator.pop(context);
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.pinkAccent,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
+            child: Text(
+              'Simpan',
+              style: TextStyle(color: Color(0xFFFFFFFF)), // Warna tombol putih
             ),
-            child: Text('Simpan'),
+            style: TextButton.styleFrom(
+              backgroundColor: Color(0xFFFB7A99), // Warna tombol pink lembut
+              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            ),
           ),
         ],
       ),
@@ -383,45 +372,94 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
                       subtitle: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Harga: Rp ${product['harga']}', style: TextStyle(fontSize: 14)),
-                          Text('Stok: ${product['stok']}', style: TextStyle(fontSize: 14)),
+                          Text('Harga: Rp ${product['harga']}', style: const TextStyle(color: Colors.black87)),
+                          Text('Stok: ${product['stok']}', style: const TextStyle(color: Colors.black87)),
+                          if (_isPelangganMember) ...[
+                            const SizedBox(height: 5),
+                            Text(
+                              'Anda Mendapat Potongan 12%',
+                              style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
+                            ),
+                          ],
                           Row(
                             children: [
                               IconButton(
-                                icon: Icon(Icons.add, color: Colors.green),
-                                onPressed: () => _addToCart(product, 1),
+                                icon: const Icon(Icons.remove, color: Colors.pinkAccent),
+                                onPressed: product['selectedQuantity'] > 1
+                                    ? () {
+                                        setState(() {
+                                          product['selectedQuantity']--;
+                                        });
+                                      }
+                                    : null,
                               ),
+                              Text('${product['selectedQuantity']}', style: const TextStyle(color: Colors.black87)),
                               IconButton(
-                                icon: Icon(Icons.remove, color: Colors.red),
-                                onPressed: () => _removeFromCart(product),
+                                icon: const Icon(Icons.add, color: Colors.pinkAccent),
+                                onPressed: product['selectedQuantity'] < product['stok']
+                                    ? () {
+                                        setState(() {
+                                          product['selectedQuantity']++;
+                                        });
+                                      }
+                                    : null,
                               ),
                             ],
                           ),
                         ],
                       ),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.add_shopping_cart, color: Colors.blueAccent),
+                        onPressed: product['stok'] > 0
+                            ? () => _addToCart(product, product['selectedQuantity']) // Menambahkan produk ke keranjang
+                            : null,
+                      ),
                     ),
                   );
                 },
               ),
-              const SizedBox(height: 20),
-              Text(
-                'Total: Rp ${_calculateTotal().toStringAsFixed(2)}',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.pink[600],
-                ),
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: _recordTransaction,
-                child: const Text('Proses Pembayaran'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.pinkAccent,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  padding: EdgeInsets.symmetric(horizontal: 40, vertical: 12),
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Keranjang Belanja:',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                    ),
+                    const SizedBox(height: 10),
+                    ..._keranjang.map((item) {
+                      return ListTile(
+                        title: Text(item['namaproduk']),
+                        subtitle: Text('Harga: Rp ${item['harga']} x ${item['quantity']}'),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.remove_circle, color: Colors.red),
+                          onPressed: () => _removeFromCart(item), // Menghapus produk dari keranjang
+                        ),
+                      );
+                    }).toList(),
+                    const SizedBox(height: 20),
+                    Text(
+                      'Total: Rp ${_calculateTotal().toStringAsFixed(2)}',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+                    ),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.pinkAccent,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                        ),
+                        onPressed: _keranjang.isEmpty ? null : _recordTransaction, // Menyelesaikan transaksi
+                        child: const Text(
+                          'Proses Pembayaran',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
