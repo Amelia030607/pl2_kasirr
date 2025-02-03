@@ -28,7 +28,7 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
       final response = await _supabase.from('produk').select();
       setState(() {
         _produk = List<Map<String, dynamic>>.from(response).map((product) {
-          product['selectedQuantity'] = 1; // Menambahkan kuantitas produk yang dipilih
+          product['selectedQuantity'] = 0; // Menambahkan kuantitas produk yang dipilih mulai dari 0
           return product;
         }).toList();
       });
@@ -61,6 +61,12 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
       );
       return;
     }
+    if (quantity == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Jumlah produk tidak bisa 0')),
+      );
+      return;
+    }
     setState(() {
       product['quantity'] = quantity;
       _keranjang.add(product); // Menambahkan produk ke keranjang
@@ -78,8 +84,9 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
   double _calculateTotal() {
     double total = _keranjang.fold(0.0, (sum, item) {
       double harga = item['harga'] * item['quantity']; // Menghitung subtotal untuk setiap item
-      if (_isPelangganMember) {
-        harga *= 0.88; // Diskon 12% jika pelanggan adalah member
+      // Cek apakah pelanggan adalah 'Pelanggan Biasa' atau bukan
+      if (_isPelangganMember && item['nama_pelanggan'] != 'Pelanggan Biasa') {
+        harga *= 0.88; // Diskon 12% jika pelanggan adalah member, kecuali 'Pelanggan Biasa'
       }
       return sum + harga; // Mengembalikan total harga
     });
@@ -103,6 +110,7 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
         'pelangganID': _selectedPelangganID,
       };
 
+      // Menyimpan data penjualan
       final responsePenjualan = await _supabase
           .from('penjualan')
           .insert(penjualanData)
@@ -114,6 +122,7 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
 
       final penjualanID = responsePenjualan[0]['penjualanID'];
 
+      // Menyimpan detail transaksi
       final detailTransaksi = _keranjang.map((item) {
         return {
           'penjualanID': penjualanID,
@@ -126,12 +135,16 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
       await _supabase.from('detailpenjualan').insert(detailTransaksi); // Menyimpan detail transaksi
       await _decreaseStock(); // Mengurangi stok produk
 
+      // Tampilkan struk pembelanjaan
+      _showReceipt();
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Transaksi berhasil! Pembayaran sudah diproses.')),
       );
 
       setState(() {
-        _keranjang.clear(); // Mengosongkan keranjang belanja setelah transaksi selesai
+        _fetchProducts(); // Refresh produk setelah pembayaran
+        _fetchPelanggan(); // Refresh pelanggan setelah pembayaran
       });
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -158,129 +171,121 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
     }
   }
 
-  // Fungsi untuk mendaftarkan pelanggan baru
-  Future<void> _registerMember(String nama, String alamat, String nomorTelepon) async {
-    // Cek apakah ada inputan yang kosong
-    if (nama.isEmpty || alamat.isEmpty || nomorTelepon.isEmpty) {
-      // Tampilkan pesan jika ada input yang kosong
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Semua field harus diisi!')),
-      );
-      return; // Menghentikan eksekusi jika ada field yang kosong
-    }
+  // Fungsi untuk menampilkan struk pembelanjaan
+  void _showReceipt() {
+    final pelanggan = _pelanggan.firstWhere((p) => p['pelangganID'] == _selectedPelangganID);
+    final namaPelanggan = pelanggan['nama_pelanggan'];
+    final tanggalTransaksi = DateTime.now().toIso8601String();
+    final bool isMember = _isPelangganMember && namaPelanggan != 'Pelanggan Biasa';
+    final String diskon = isMember ? '12%' : '0%';
+    final double totalPembayaran = _calculateTotal();
+    final double totalSetelahDiskon = isMember ? totalPembayaran * 0.88 : totalPembayaran;
 
-    try {
-      await _supabase.from('pelanggan').insert({
-        'nama_pelanggan': nama,
-        'alamat': alamat,
-        'nomor_telepon': nomorTelepon,
-        'created_at': DateTime.now().toIso8601String(),
-      });
-
-      // Tampilkan pesan sukses setelah data berhasil disimpan
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Registrasi pelanggan berhasil!')),
-      );
-
-      // Memuat ulang daftar pelanggan setelah registrasi
-      _fetchPelanggan();
-    } catch (e) {
-      // Tampilkan pesan gagal jika terjadi error
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal registrasi pelanggan: $e')),
-      );
-    }
-  }
-
-  // Fungsi untuk menampilkan dialog registrasi pelanggan
-  void _showRegisterDialog() {
-    // Controller untuk setiap inputan (nama, alamat, nomor telepon)
-    final TextEditingController namaController = TextEditingController();
-    final TextEditingController alamatController = TextEditingController();
-    final TextEditingController teleponController = TextEditingController();
-
-    // Menampilkan dialog untuk registrasi pelanggan baru
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.pink[50], 
-        title: Text(
-          'Registrasi Pelanggan Baru',
-          style: TextStyle(color: Colors.pink[900]), 
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min, // Memastikan kolom memiliki ukuran minimum
-          children: [
-            TextField(
-              controller: namaController,
-              decoration: InputDecoration(
-                labelText: 'Nama', 
-                labelStyle: TextStyle(color: Colors.pink[700]), 
-                border: OutlineInputBorder(), // Border kotak untuk input
-              ),
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: Color(0xFFFFF0F5), // Soft pink background
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(15),
+          ),
+          title: Center(
+            child: Text(
+              '🛒 Struk Pembelian 🛍️',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black87),
             ),
-            SizedBox(height: 10), // Spasi antar input
-            
-            // Input untuk Alamat
-            TextField(
-              controller: alamatController,
-              decoration: InputDecoration(
-                labelText: 'Alamat', 
-                labelStyle: TextStyle(color: Colors.pink[700]), 
-                border: OutlineInputBorder(), 
-              ),
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Nama Pelanggan: $namaPelanggan', style: TextStyle(fontWeight: FontWeight.bold)),
+                Text('Tanggal: ${tanggalTransaksi.substring(0, 10)}'),
+                Divider(color: Colors.black54),
+                ..._keranjang.map((item) {
+                  final int totalHarga = item['harga'] * item['quantity'];
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 5),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Nama Produk: ${item['namaproduk']}', style: TextStyle(fontWeight: FontWeight.bold)),
+                        Text('Jumlah: ${item['quantity']}'),
+                        Text('Harga per item: Rp ${item['harga']}'),
+                        Text(
+                          'Subtotal: Rp $totalHarga',
+                          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
+                        ),
+                        Divider(color: Colors.black26),
+                      ],
+                    ),
+                  );
+                }).toList(),
+                Divider(thickness: 1.5, color: Colors.black54),
+                Text('Diskon: $diskon', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.red)),
+                Text(
+                  'Total Pembayaran: Rp ${totalSetelahDiskon.toStringAsFixed(0)}',
+                  style: TextStyle(fontSize: 18, color: const Color.fromARGB(255, 0, 0, 0)),
+                ),
+              ],
             ),
-            SizedBox(height: 10), 
-
-            // Input untuk Nomor Telepon
-            TextField(
-              controller: teleponController,
-              decoration: InputDecoration(
-                labelText: 'Nomor Telepon', 
-                labelStyle: TextStyle(color: Colors.pink[700]), 
-                border: OutlineInputBorder(), 
+          ),
+          actions: [
+            Center(
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.pinkAccent,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                ),
+                onPressed: () {
+                  _showConfirmationDialog(context); // Tampilkan konfirmasi sebelum menutup
+                },
+                child: Text('Tutup', style: TextStyle(color: Colors.white)),
               ),
             ),
           ],
-        ),
-        actions: [
-          // Tombol Batal
-          TextButton(
-            onPressed: () => Navigator.pop(context), // Menutup dialog saat tombol batal ditekan
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10), // Padding tombol
-              decoration: BoxDecoration(
-                color: Colors.pink[200], 
-                borderRadius: BorderRadius.circular(5), // Membuat sudut tombol membulat
-              ),
-              child: Text(
-                'Batal',
-                style: TextStyle(color: Colors.white), 
-              ),
-            ),
-          ),
-          // Tombol Simpan
-          TextButton(
-            onPressed: () {
-              // Menyimpan data jika tombol Simpan ditekan
-              _registerMember(namaController.text, alamatController.text, teleponController.text);
-              Navigator.pop(context); // Menutup dialog setelah data disimpan
-            },
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10), 
-              decoration: BoxDecoration(
-                color: Colors.pink[300], 
-                borderRadius: BorderRadius.circular(5), // Membuat sudut tombol membulat
-              ),
-              child: Text(
-                'Simpan',
-                style: TextStyle(color: Colors.white), 
-              ),
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
+  }
+
+  // Konfirmasi sebelum menutup
+  void _showConfirmationDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text("Konfirmasi"),
+          content: Text("Apakah Anda yakin ingin menutup struk ini?"),
+          actions: [
+            TextButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              onPressed: () {
+                Navigator.of(context).pop(); // Batal, kembali ke struk
+              },
+              child: Text("Batal",  style: TextStyle(color: Colors.white)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.pinkAccent),
+              onPressed: () {
+                Navigator.of(context).pop(); // Tutup konfirmasi
+                Navigator.of(context).pop(); // Tutup struk
+                _clearCart(); // Kosongkan keranjang setelah menutup struk
+              },
+              child: Text("Ya", style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Fungsi untuk mengosongkan keranjang
+  void _clearCart() {
+    setState(() {
+      _keranjang.clear(); // Kosongkan daftar keranjang
+    });
   }
 
   @override
@@ -294,17 +299,17 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.people, color: Colors.white),
+              Icon(Icons.monetization_on, color: Colors.white),
               SizedBox(width: 8),
               RichText(
                 text: TextSpan(
                   children: [
                     TextSpan(
-                      text: "DAFTAR ",
+                      text: "TRANSAKSI ",
                       style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
                     ),
                     TextSpan(
-                      text: "PELANGGAN",
+                      text: "PEMBELIAN",
                       style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.yellow),
                     ),
                   ],
@@ -314,15 +319,6 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
           ),
         ),
         backgroundColor: Color.fromARGB(255, 255, 90, 145),
-        actions: [
-          Tooltip(
-            message: "Daftar Pelanggan",
-            child: IconButton(
-              icon: const Icon(Icons.group_add),
-              onPressed: _showRegisterDialog, // Menampilkan dialog registrasi
-            ),
-          ),
-        ],
       ),
       body: SingleChildScrollView(
         child: Container(
@@ -348,7 +344,7 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  dropdownColor: Colors.pink[100],
+                  dropdownColor: Color.fromARGB(255, 255, 255, 255),
                   isExpanded: true,
                   items: _pelanggan.map((pelanggan) {
                     return DropdownMenuItem<int>(
@@ -373,7 +369,7 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
                     setState(() {
                       _selectedPelangganID = value;
                       // Memeriksa apakah pelanggan adalah member
-                      _isPelangganMember = _pelanggan.any((pelanggan) => pelanggan['pelangganID'] == value);
+                      _isPelangganMember = _pelanggan.any((pelanggan) => pelanggan['pelangganID'] == value && pelanggan['nama_pelanggan'] != 'Pelanggan Biasa');
                     });
                   },
                 ),
@@ -384,19 +380,24 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
                 itemCount: _produk.length,
                 itemBuilder: (context, index) {
                   final product = _produk[index];
+                  TextEditingController _quantityController = TextEditingController(text: product['selectedQuantity'].toString());
+
                   return Card(
                     color: headerColor,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: ListTile(
-                      title: Text(product['namaproduk'], style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.pinkAccent)),
+                      title: Text(
+                        product['namaproduk'],
+                        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.pinkAccent),
+                      ),
                       subtitle: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text('Harga: Rp ${product['harga']}', style: const TextStyle(color: Colors.black87)),
                           Text('Stok: ${product['stok']}', style: const TextStyle(color: Colors.black87)),
-                          if (_isPelangganMember) ...[
+                          if (_isPelangganMember && product['nama_pelanggan'] != 'Pelanggan Biasa') ...[
                             const SizedBox(height: 5),
                             Text(
                               'Anda Mendapat Potongan 12%',
@@ -407,21 +408,46 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
                             children: [
                               IconButton(
                                 icon: const Icon(Icons.remove, color: Colors.pinkAccent),
-                                onPressed: product['selectedQuantity'] > 1
+                                onPressed: product['selectedQuantity'] > 0
                                     ? () {
                                         setState(() {
                                           product['selectedQuantity']--;
+                                          _quantityController.text = product['selectedQuantity'].toString(); // Update TextField
                                         });
                                       }
                                     : null,
                               ),
-                              Text('${product['selectedQuantity']}', style: const TextStyle(color: Colors.black87)),
+                              // TextField untuk input jumlah produk
+                              SizedBox(
+                                width: 38,
+                                height: 38,
+                                child: TextField(
+                                  controller: _quantityController,
+                                  keyboardType: TextInputType.number,
+                                  textAlign: TextAlign.center,
+                                  decoration: InputDecoration(border: OutlineInputBorder()),
+                                  onChanged: (value) {
+                                    // Memastikan input adalah angka dan valid
+                                    int? newQuantity = int.tryParse(value);
+                                    if (newQuantity != null &&
+                                        newQuantity >= 0 &&
+                                        newQuantity <= product['stok']) {
+                                      setState(() {
+                                        product['selectedQuantity'] = newQuantity;
+                                      });
+                                    } else {
+                                      _quantityController.text = product['selectedQuantity'].toString(); // Reset input jika tidak valid
+                                    }
+                                  },
+                                ),
+                              ),
                               IconButton(
                                 icon: const Icon(Icons.add, color: Colors.pinkAccent),
                                 onPressed: product['selectedQuantity'] < product['stok']
                                     ? () {
                                         setState(() {
                                           product['selectedQuantity']++;
+                                          _quantityController.text = product['selectedQuantity'].toString(); // Update TextField
                                         });
                                       }
                                     : null,
@@ -440,6 +466,7 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
                   );
                 },
               ),
+            
               Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
@@ -453,31 +480,26 @@ class _TransaksiScreenState extends State<TransaksiScreen> {
                     ..._keranjang.map((item) {
                       return ListTile(
                         title: Text(item['namaproduk']),
-                        subtitle: Text('Harga: Rp ${item['harga']} x ${item['quantity']}'),
+                        subtitle: Text('Jumlah: ${item['quantity']}'),
                         trailing: IconButton(
                           icon: const Icon(Icons.remove_circle, color: Colors.red),
-                          onPressed: () => _removeFromCart(item), // Menghapus produk dari keranjang
+                          onPressed: () => _removeFromCart(item),
                         ),
                       );
                     }).toList(),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 10),
                     Text(
-                      'Total: Rp ${_calculateTotal().toStringAsFixed(2)}',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+                      'Total Pembayaran: Rp ${_calculateTotal().toStringAsFixed(0)}',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
                     ),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.pinkAccent,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                        ),
-                        onPressed: _keranjang.isEmpty ? null : _recordTransaction, // Menyelesaikan transaksi
-                        child: const Text(
-                          'Proses Pembayaran',
-                          style: TextStyle(color: Colors.white),
+                    const SizedBox(height: 20),
+                    ElevatedButton(
+                      onPressed: _recordTransaction,
+                      child: const Text('Proses Pembayaran', style: TextStyle(color: Colors.white, fontSize: 18)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.pinkAccent,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
                       ),
                     ),

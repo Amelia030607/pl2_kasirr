@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'; 
 import 'home.dart'; 
 
-
 class LoginScreen extends StatefulWidget {
   @override
   _LoginScreenState createState() => _LoginScreenState(); 
@@ -12,44 +11,64 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _emailController = TextEditingController(); // Kontrol untuk input email
   final TextEditingController _passwordController = TextEditingController(); // Kontrol untuk input password
   bool _obscureText = true; // Variabel untuk mengontrol visibilitas password
+  String? _emailError; // Variabel untuk menyimpan pesan error email
+  String? _passwordError; // Variabel untuk menyimpan pesan error password
 
-  // Fungsi untuk menangani login
   Future<void> _login() async {
-    final email = _emailController.text.trim(); // Mengambil nilai email dan menghapus spasi di awal/akhir
-    final password = _passwordController.text.trim(); // Mengambil nilai password dan menghapus spasi di awal/akhir
+    final email = _emailController.text.trim(); // Mengambil nilai email dengan menghapus spasi di awal/akhir
+    final password = _passwordController.text.trim(); // Mengambil nilai password dengan menghapus spasi di awal/akhir
+    setState(() {
+      _emailError = null; // Reset error email
+      _passwordError = null; // Reset error password
+    });
 
-    // Validasi jika email atau password kosong
-    if (email.isEmpty || password.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Email dan password tidak boleh kosong')), 
-      );
+    if (email.isEmpty && password.isEmpty) { // Jika email dan password kosong
+      setState(() {
+        _emailError = 'Email wajib terisi';
+        _passwordError = 'Password wajib terisi';
+      });
+      return;
+    }
+    if (email.isEmpty) { // Jika hanya email kosong
+      setState(() {
+        _emailError = 'Email tidak boleh kosong';
+      });
+      return;
+    }
+
+    if (password.isEmpty) { // Jika hanya password kosong
+      setState(() {
+        _passwordError = 'Password tidak boleh kosong';
+      });
       return;
     }
 
     try {
-      // Query ke tabel 'user' di Supabase untuk mencocokkan email dan password
       final response = await Supabase.instance.client
           .from('user')
-          .select('role') // Memilih kolom role untuk menentukan peran pengguna
-          .eq('email', email) // Kondisi untuk mencocokkan email
-          .eq('password', password) // Kondisi untuk mencocokkan password
-          .maybeSingle(); // Mengambil hasil tunggal atau null jika tidak ada
+          .select('email, password, role')
+          .eq('email', email)
+          .maybeSingle(); // Mengambil satu data pengguna berdasarkan email
 
-      // Jika tidak ditemukan data yang cocok
-      if (response == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Login gagal! Email atau password salah.')), // Menampilkan pesan kesalahan
-        );
+      if (response == null) { // Jika email tidak ditemukan
+        setState(() {
+          _emailError = 'Email salah';
+        });
         return;
       }
 
-      final role = response['role']; // Mengambil peran pengguna dari hasil query
+      if (response['password'] != password) { // Jika password salah
+        setState(() {
+          _passwordError = 'Password salah';
+        });
+        return;
+      }
 
+      final role = response['role']; // Mengambil peran pengguna
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Login berhasil! Selamat datang $email')), // Menampilkan pesan sukses
+        SnackBar(content: Text('Login berhasil! Selamat datang $email')),
       );
 
-      // Navigasi ke halaman HomeScreen dengan username dan role
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -58,7 +77,7 @@ class _LoginScreenState extends State<LoginScreen> {
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Terjadi kesalahan: $e')), // Menampilkan pesan kesalahan jika ada exception
+        SnackBar(content: Text('Terjadi kesalahan: $e')),
       );
     }
   }
@@ -66,94 +85,96 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.pink.shade100, 
+      backgroundColor: Colors.pink.shade100, // Warna latar belakang halaman login
       body: Center(
-        child: SingleChildScrollView( // Mengizinkan layar untuk menggulir jika kontennya panjang
+        child: SingleChildScrollView( // Agar tampilan bisa di-scroll jika kontennya panjang
           child: Container(
-            padding: const EdgeInsets.all(20), // Margin dalam untuk kontainer
-            width: 350, // Lebar kontainer
+            padding: const EdgeInsets.all(20), // Padding dalam kontainer
+            width: 350, // Lebar kontainer login
             decoration: BoxDecoration(
               color: Colors.white, // Warna latar belakang kontainer
-              borderRadius: BorderRadius.circular(20), // Membuat sudut membulat
+              borderRadius: BorderRadius.circular(20), // Membuat sudut kontainer membulat
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1), // Warna bayangan dengan opasitas 10%
-                  blurRadius: 10, // Radius bayangan
+                  color: Colors.black.withOpacity(0.1), // Warna bayangan
+                  blurRadius: 10, // Radius blur bayangan
                   offset: const Offset(0, 5), // Posisi bayangan
                 ),
               ],
             ),
             child: Column(
-              mainAxisSize: MainAxisSize.min, // Ukuran kolom menyesuaikan isi
+              mainAxisSize: MainAxisSize.min, // Kolom menyesuaikan ukuran sesuai isi
               children: [
                 const CircleAvatar(
-                  radius: 50, // Ukuran lingkaran
-                  backgroundColor: Colors.pinkAccent, // Warna latar lingkaran
-                  child: Icon(Icons.person, size: 50, color: Colors.white), // Ikon pengguna di dalam lingkaran
+                  radius: 50, // Ukuran lingkaran avatar
+                  backgroundColor: Colors.pinkAccent, // Warna latar belakang avatar
+                  child: Icon(Icons.person, size: 50, color: Colors.white), // Ikon avatar
                 ),
                 const SizedBox(height: 20), // Jarak antar elemen
                 const Text(
-                  "WELCOME TO OUR WEBSITE", 
+                  "SELAMAT DATANG DIKASIR CAKE",
                   style: TextStyle(
-                    fontSize: 16, 
+                    fontSize: 16,
                     fontWeight: FontWeight.bold,
                     color: Colors.pinkAccent,
                   ),
                 ),
-                const SizedBox(height: 20), // Jarak antar elemen
+                const SizedBox(height: 20),
                 TextField(
-                  controller: _emailController, // Menghubungkan input dengan kontrol email
+                  controller: _emailController, // Controller untuk email
                   decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.person, color: Colors.pinkAccent), 
-                    hintText: 'Email', // Placeholder untuk input
-                    filled: true, // Mengisi latar belakang kotak input
+                    prefixIcon: const Icon(Icons.person, color: Colors.pinkAccent),
+                    hintText: 'Email',
+                    filled: true,
                     fillColor: Colors.pink.shade50,
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10), // Membuat sudut membulat
-                      borderSide: BorderSide.none, // Menghapus border default
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide.none,
                     ),
+                    errorText: _emailError, // Menampilkan pesan error email jika ada
                   ),
                 ),
-                const SizedBox(height: 16), // Jarak antar elemen
+                const SizedBox(height: 16),
                 TextField(
-                  controller: _passwordController, // Menghubungkan input dengan kontrol password
-                  obscureText: _obscureText, // Menentukan apakah password disembunyikan atau tidak
+                  controller: _passwordController, // Controller untuk password
+                  obscureText: _obscureText, // Mengontrol visibilitas password
                   decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.lock, color: Colors.pinkAccent), 
-                    hintText: 'Password', // Placeholder untuk input
-                    filled: true, // Mengisi latar belakang kotak input
-                    fillColor: Colors.pink.shade50, 
+                    prefixIcon: const Icon(Icons.lock, color: Colors.pinkAccent),
+                    hintText: 'Password',
+                    filled: true,
+                    fillColor: Colors.pink.shade50,
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10), // Membuat sudut membulat
-                      borderSide: BorderSide.none, // Menghapus border default
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide.none,
                     ),
+                    errorText: _passwordError, // Menampilkan pesan error password jika ada
                     suffixIcon: IconButton(
                       icon: Icon(
-                        _obscureText ? Icons.visibility_off : Icons.visibility, // Ikon untuk menunjukkan atau menyembunyikan password
-                        color: Colors.pinkAccent, // Warna ikon
+                        _obscureText ? Icons.visibility_off : Icons.visibility,
+                        color: Colors.pinkAccent,
                       ),
                       onPressed: () {
                         setState(() {
-                          _obscureText = !_obscureText; // Mengubah visibilitas password
+                          _obscureText = !_obscureText; // Toggle visibilitas password
                         });
                       },
                     ),
                   ),
                 ),
-                const SizedBox(height: 20), // Jarak antar elemen
+                const SizedBox(height: 20),
                 SizedBox(
-                  width: double.infinity, // Memastikan tombol memiliki lebar penuh
+                  width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: _login, // Fungsi login dipanggil saat tombol ditekan
+                    onPressed: _login, // Memanggil fungsi login saat tombol ditekan
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.pinkAccent, // Warna tombol
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10), // Membuat sudut membulat
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                      padding: const EdgeInsets.symmetric(vertical: 15), // Padding vertikal tombol
+                      padding: const EdgeInsets.symmetric(vertical: 15),
                     ),
                     child: const Text(
-                      'LOGIN', 
+                      'LOGIN',
                       style: TextStyle(fontSize: 16, color: Colors.white),
                     ),
                   ),

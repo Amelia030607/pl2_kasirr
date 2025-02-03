@@ -10,15 +10,25 @@ class ProfilScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Profil', 
-        style: TextStyle(
-          fontSize: 24, 
-          color: Colors.white,
+        title: Row(
+          mainAxisSize: MainAxisSize.min, // Menyesuaikan ukuran kolom
+          children: [
+            Icon(Icons.person, color: Colors.white), // Menambahkan ikon person
+            const SizedBox(width: 8), // Jarak antara ikon dan teks
+            const Text(
+              'PROFIL',
+              style: TextStyle(
+                fontSize: 18, 
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+          ],
         ),
-         ), 
-        centerTitle: true, 
-        backgroundColor: Color.fromARGB(255, 255, 90, 145), 
+        centerTitle: true,
+        backgroundColor: Color.fromARGB(255, 255, 90, 145), // Warna latar belakang AppBar
       ),
+
       body: Container(
         color: Colors.pink[50], 
         child: Center(

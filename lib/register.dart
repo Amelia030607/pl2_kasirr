@@ -7,143 +7,397 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
-  final _formKey = GlobalKey<FormState>(); // Kunci untuk form validasi
-  final _emailController = TextEditingController(); // Controller untuk input email
-  final _passwordController = TextEditingController(); // Controller untuk input password
-  bool _isLoading = false; // Status untuk menunjukkan apakah proses loading sedang berlangsung
-  bool _isPasswordVisible = false; // Untuk mengontrol visibilitas password
+  final _formKey = GlobalKey<FormState>();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _roleController = TextEditingController();
+  bool _isLoading = false;
+  bool _isPasswordVisible = false;
+  final _roles = ['pegawai', 'admin'];
+  final supabase = Supabase.instance.client;
 
-  // Fungsi untuk melakukan registrasi
   Future<void> _register() async {
-    if (!_formKey.currentState!.validate()) return; // Jika form tidak valid, hentikan proses
+    if (!_formKey.currentState!.validate()) return;
 
-    setState(() {
-      _isLoading = true; // Tampilkan indikator loading
-    });
-
-    final email = _emailController.text.trim(); // Ambil email dari controller dan hapus spasi
-    final password = _passwordController.text.trim(); // Ambil password dari controller dan hapus spasi
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+    final role = _roleController.text.trim().isEmpty ? _roles.first : _roleController.text.trim();
+    setState(() => _isLoading = true);
 
     try {
-      final supabase = Supabase.instance.client;
-
-      // Cek apakah email sudah digunakan
       final existingUser = await supabase
           .from('user')
-          .select('email') // Pilih kolom email
-          .eq('email', email) // Cek apakah email sudah ada di database
-          .maybeSingle(); // Ambil data tunggal jika ada
+          .select('email')
+          .eq('email', email)
+          .maybeSingle();
 
       if (existingUser != null) {
-        // Jika email sudah terdaftar, tampilkan pesan error
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Email sudah terdaftar!')),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Email sudah terdaftar!')));
       } else {
-        // Jika email belum terdaftar, cari ID terbesar dan tambahkan 1
         final maxIdData = await supabase
             .from('user')
-            .select('id') // Pilih kolom id
-            .order('id', ascending: false) // Urutkan berdasarkan ID terbesar
-            .limit(1) // Ambil hanya 1 data
-            .maybeSingle(); // Ambil data tunggal jika ada
+            .select('id')
+            .order('id', ascending: false)
+            .limit(1)
+            .maybeSingle();
 
         int newId = (maxIdData != null && maxIdData['id'] != null)
-            ? (maxIdData['id'] as int) + 1 // Tambahkan 1 pada ID terbesar
-            : 1; // Jika tidak ada data ID, mulai dari 1
+            ? (maxIdData['id'] as int) + 1
+            : 1;
 
-        // Insert data user baru ke dalam tabel 'user'
         await supabase.from('user').insert({
-          'id': newId, // ID baru yang dihasilkan
-          'email': email, // Email dari input
-          'password': password, // Password dari input
-          'role': 'pelanggan', // Role sebagai pelanggan
-          'created_at': DateTime.now().toIso8601String(), // Tanggal pembuatan akun
+          'id': newId,
+          'email': email,
+          'password': password,
+          'role': role,
+          'created_at': DateTime.now().toIso8601String(),
         });
 
-        // Tampilkan pesan sukses
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Registrasi berhasil! Anda menjadi member dan mendapatkan diskon 15%')),
-        );
-
-        // Kembali ke halaman sebelumnya setelah registrasi sukses
-        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Registrasi berhasil!')));
       }
     } catch (error) {
-      // Jika terjadi error, tampilkan pesan error
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Registrasi gagal: $error')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Registrasi gagal: $error')));
     } finally {
-      setState(() {
-        _isLoading = false; // Set status loading ke false setelah proses selesai
-      });
+      setState(() => _isLoading = false);
     }
+  }
+
+  Future<void> _updateUser(int id, String email, String password, String role) async {
+    setState(() => _isLoading = true);
+    try {
+      await supabase.from('user').update({
+        'email': email,
+        'password': password,
+        'role': role,
+      }).eq('id', id);
+
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Data berhasil diperbarui!')));
+    } catch (error) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Update gagal: $error')));
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _deleteUser(int id) async {
+    bool confirmDelete = await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Konfirmasi'),
+        content: Text('Apakah Anda yakin ingin menghapus data ini?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Batal', style: TextStyle(color: Colors.white)),
+             style: TextButton.styleFrom(backgroundColor: Colors.red),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text('Hapus', style: TextStyle(color: Colors.white)),
+              style: TextButton.styleFrom(backgroundColor: Colors.pinkAccent),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmDelete == true) {
+      await supabase.from('user').delete().eq('id', id);
+      setState(() {});
+    }
+  }
+
+  void _editUserDialog(BuildContext context, Map<String, dynamic> user) {
+    _emailController.text = user['email'];
+    _passwordController.text = user['password'];
+    _roleController.text = user['role'];
+
+    bool isEditPasswordVisible = false;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: Text('Edit User'),
+              content: SingleChildScrollView(
+                child: Column(
+                  children: [
+                    TextField(
+                      controller: _emailController,
+                      decoration: InputDecoration(labelText: 'Email'),
+                    ),
+                    TextField(
+                      controller: _passwordController,
+                      obscureText: !isEditPasswordVisible,
+                      decoration: InputDecoration(
+                        labelText: 'Password',
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            isEditPasswordVisible ? Icons.visibility : Icons.visibility_off,
+                          ),
+                          onPressed: () {
+                            setDialogState(() {
+                              isEditPasswordVisible = !isEditPasswordVisible;
+                            });
+                          },
+                        ),
+                      ),
+                    ),
+                    DropdownButtonFormField<String>(
+                      value: _roleController.text.isEmpty ? _roles.first : _roleController.text,
+                      items: _roles.map((role) {
+                        return DropdownMenuItem(
+                          value: role,
+                          child: Text(role),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        setDialogState(() {
+                          _roleController.text = value ?? _roles.first;
+                        });
+                      },
+                      decoration: InputDecoration(labelText: 'Role'),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () async {
+                    bool cancelEdit = await showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: Text('Konfirmasi Batal'),
+                        content: Text('Apakah Anda yakin ingin membatalkan ?'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, false),
+                            child: Text('Tidak', style: TextStyle(color: Colors.white)),
+                              style: TextButton.styleFrom(backgroundColor: Colors.red),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            child: Text('Ya', style: TextStyle(color: Colors.white)),
+                              style: TextButton.styleFrom(backgroundColor: Colors.pinkAccent),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (cancelEdit == true) {
+                      Navigator.pop(context); // Tutup dialog edit
+                    }
+                  },
+                  child: Text('Batal', style: TextStyle(color: Colors.white)),
+                  style: TextButton.styleFrom(backgroundColor: Colors.red),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    _updateUser(user['id'], _emailController.text, _passwordController.text, _roleController.text);
+                    Navigator.pop(context);
+                  },
+                  child: Text('Simpan', style: TextStyle(color: Colors.white)),
+                  style: TextButton.styleFrom(backgroundColor: Colors.pinkAccent),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchUsers() async {
+    return await supabase.from('user').select();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Registrasi Member'), 
+        title: Row(
+          mainAxisSize: MainAxisSize.min, // Menyesuaikan ukuran kolom
+          children: [
+            Icon(Icons.person_add, color: Colors.white), // Menambahkan ikon person_add
+            const SizedBox(width: 8), // Jarak antara ikon dan teks
+            const Text(
+              'REGISTRASI',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18), // Warna teks putih
+            ),
+          ],
+        ),
+        centerTitle: true,
         backgroundColor: Colors.pinkAccent, 
       ),
       body: Container(
         color: Colors.pink[50], 
-        padding: const EdgeInsets.all(20.0), // Padding di seluruh body
-        child: Form(
-          key: _formKey, // Menyambungkan form dengan kunci untuk validasi
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center, // Menyusun elemen secara horizontal di tengah
-            children: [
-              // Input untuk email
-              TextFormField(
-                controller: _emailController,
-                decoration: InputDecoration(
-                  labelText: 'Email',
-                  border: OutlineInputBorder(), // Border untuk field
-                  prefixIcon: Icon(Icons.email), // Ikon untuk field email
-                ),
-                keyboardType: TextInputType.emailAddress, // Mengatur jenis keyboard menjadi email
-                validator: (value) => value!.isEmpty ? 'Masukkan email yang valid' : null, // Validasi email
-              ),
-              const SizedBox(height: 15), 
-              // Input untuk password
-              TextFormField(
-                controller: _passwordController, 
-                obscureText: !_isPasswordVisible, // Menentukan apakah password disembunyikan atau tidak
-                decoration: InputDecoration(
-                  labelText: 'Password', 
-                  border: OutlineInputBorder(), // Border untuk field
-                  prefixIcon: Icon(Icons.lock), // Ikon untuk field password
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _isPasswordVisible
-                          ? Icons.visibility // Ikon mata terbuka jika password terlihat
-                          : Icons.visibility_off, // Ikon mata tertutup jika password disembunyikan
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _isPasswordVisible = !_isPasswordVisible; // Toggle visibilitas password
-                      });
-                    },
-                  ),
-                ),
-                validator: (value) => value!.length < 6 ? 'Password minimal 6 karakter' : null, // Validasi password
-              ),
-              const SizedBox(height: 20), 
-              // Tombol untuk melakukan registrasi
-              _isLoading
-                  ? CircularProgressIndicator() // Menampilkan indikator loading jika sedang proses
-                  : ElevatedButton(
-                      onPressed: _register, // Panggil fungsi registrasi saat tombol ditekan
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.pinkAccent), 
-                      child: const Text('Daftar Member', style: TextStyle(color: Colors.white)), 
-                    ),
-            ],
-          ),
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          children: [
+            FutureBuilder<List<Map<String, dynamic>>>(  
+              future: _fetchUsers(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) return CircularProgressIndicator();
+                final users = snapshot.data!;
+                return ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: users.length,
+                  itemBuilder: (context, index) {
+                    final user = users[index];
+                    return Card(
+                      elevation: 5,
+                      margin: EdgeInsets.symmetric(vertical: 8),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      color: Colors.white, // White card color
+                      child: ListTile(
+                        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        title: Text(user['email'], style: TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Password: ${user['password']}'),
+                            Text('Role: ${user['role']}'),
+                          ],
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: Icon(Icons.edit, color: Colors.blue),
+                              onPressed: () => _editUserDialog(context, user),
+                            ),
+                            IconButton(
+                              icon: Icon(Icons.delete, color: Colors.red),
+                              onPressed: () => _deleteUser(user['id']),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ],
         ),
       ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          _showAddUserDialog(context);
+        },
+        backgroundColor: Colors.pinkAccent,
+        child: Icon(Icons.add, color: Colors.white),
+      ),
+    );
+  }
+
+  void _showAddUserDialog(BuildContext context) {
+    _emailController.clear();
+    _passwordController.clear();
+    _roleController.clear();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: Text('Tambah User Baru'),
+              content: SingleChildScrollView(
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    children: [
+                      TextFormField(
+                        controller: _emailController,
+                        decoration: InputDecoration(labelText: 'Email'),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Email belum terisi';
+                          }
+                          // if (!value.contains('@gmail.com')) {
+                          //   return 'Email wajib menggunakan @gmail.com';
+                          // }
+                          return null;
+                        },
+                      ),
+                      TextFormField(
+                        controller: _passwordController,
+                        obscureText: !_isPasswordVisible,
+                        decoration: InputDecoration(
+                          labelText: 'Password',
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _isPasswordVisible ? Icons.visibility : Icons.visibility_off,
+                            ),
+                            onPressed: () => setDialogState(() => _isPasswordVisible = !_isPasswordVisible),
+                          ),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Password wajib terisi';
+                          }
+                          if (value.length < 6) {
+                            return 'Password minimal 6 karakter';
+                          }
+                          return null;
+                        },
+                      ),
+                      DropdownButtonFormField<String>(
+                        value: _roles.first,
+                        items: _roles.map((role) => DropdownMenuItem(value: role, child: Text(role))).toList(),
+                        onChanged: (value) => setDialogState(() => _roleController.text = value ?? _roles.first),
+                        decoration: InputDecoration(labelText: 'Role'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () async {
+                    bool cancelAdd = await showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: Text('Konfirmasi Batal'),
+                        content: Text('Apakah Anda yakin ingin membatalkan ?'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, false),
+                            child: Text('Tidak', style: TextStyle(color: Colors.white)),
+                             style: TextButton.styleFrom(backgroundColor: Colors.red),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            child: Text('Ya', style: TextStyle(color: Colors.white)),
+                             style: TextButton.styleFrom(backgroundColor: Colors.pinkAccent),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (cancelAdd == true) {
+                      Navigator.pop(context); // Menutup dialog
+                    }
+                  },
+                  child: Text('Batal', style: TextStyle(color: Colors.white)),
+                  style: TextButton.styleFrom(backgroundColor: Colors.red),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    if (_formKey.currentState!.validate()) {
+                      _register();
+                    }
+                  },
+                  child: Text('Tambah User', style: TextStyle(color: Colors.white)),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.pinkAccent),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 }
