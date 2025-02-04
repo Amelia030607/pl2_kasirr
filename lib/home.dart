@@ -115,7 +115,8 @@ class _HomeScreenState extends State<HomeScreen> {
               onPressed: () {
                 Navigator.pop(context, false); // Tutup dialog tanpa logout
               },
-              child: const Text('Batal'),
+              child: Text('Batal', style: TextStyle(color: Colors.white)),
+                style: TextButton.styleFrom(backgroundColor: Colors.red),
             ),
             TextButton(
               onPressed: () async {
@@ -125,7 +126,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   MaterialPageRoute(builder: (context) => LoginScreen()), // Kembali ke halaman login
                 );
               },
-              child: const Text('Keluar'),
+              child: Text('Keluar', style: TextStyle(color: Colors.white)),
+                style: TextButton.styleFrom(backgroundColor: Colors.pinkAccent),
             ),
           ],
         );

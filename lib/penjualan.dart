@@ -1,3 +1,4 @@
+import 'dart:async'; // Import untuk Timer
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'transaksi.dart';
@@ -12,11 +13,13 @@ class PenjualanScreen extends StatefulWidget {
 class _PenjualanScreenState extends State<PenjualanScreen> {
   final SupabaseClient _supabase = Supabase.instance.client;
   List<Map<String, dynamic>> _penjualan = [];
+  Timer? _timer;
 
   @override
   void initState() {
     super.initState();
     _fetchPenjualan(); // Memanggil fungsi untuk mengambil data penjualan dari Supabase
+    _startAutoRefresh(); // Memulai auto-refresh dengan Timer
   }
 
   // Fungsi untuk mengambil semua data penjualan dari Supabase
@@ -37,10 +40,23 @@ class _PenjualanScreenState extends State<PenjualanScreen> {
     }
   }
 
+  // Memulai timer untuk auto-refresh setiap 10 detik
+  void _startAutoRefresh() {
+    _timer = Timer.periodic(Duration(seconds: 10), (_) {
+      _fetchPenjualan(); // Menyegarkan data setiap 10 detik
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel(); // Membatalkan timer ketika widget dihapus
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-     appBar: AppBar(
+      appBar: AppBar(
         title: Center(
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -195,13 +211,16 @@ class DetailTransaksiScreen extends StatefulWidget {
 class _DetailTransaksiScreenState extends State<DetailTransaksiScreen> {
   final SupabaseClient _supabase = Supabase.instance.client;
   List<Map<String, dynamic>> _detailPenjualan = [];
+  Timer? _timer;
 
   @override
   void initState() {
     super.initState();
     _fetchDetailPenjualan(); // Memanggil fungsi untuk mengambil detail penjualan dari Supabase
+    _startAutoRefresh(); // Memulai auto-refresh dengan Timer
   }
 
+  // Fungsi untuk mengambil detail penjualan dari Supabase
   Future<void> _fetchDetailPenjualan() async {
     try {
       final response = await _supabase
@@ -217,6 +236,19 @@ class _DetailTransaksiScreenState extends State<DetailTransaksiScreen> {
         SnackBar(content: Text('Gagal memuat detail transaksi: $e')),
       );
     }
+  }
+
+  // Memulai timer untuk auto-refresh setiap 10 detik
+  void _startAutoRefresh() {
+    _timer = Timer.periodic(Duration(seconds: 10), (_) {
+      _fetchDetailPenjualan(); // Menyegarkan data setiap 10 detik
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel(); // Membatalkan timer ketika widget dihapus
+    super.dispose();
   }
 
   @override
